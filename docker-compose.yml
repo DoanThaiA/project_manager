@@ -1,35 +1,18 @@
+# Database dùng chung server PostgreSQL của ai_carbon_analyst, database riêng `project_manager`,
+# user riêng `pm_user`. Khởi tạo lần đầu: scripts/init_db.sh. Cấu hình trong .env (xem .env.example).
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: project_manager_db
-    environment:
-      POSTGRES_DB: project_manager
-      POSTGRES_USER: pm_user
-      POSTGRES_PASSWORD: pm_password
-      TZ: Asia/Ho_Chi_Minh
-    ports:
-      - "5435:5432"
-    volumes:
-      - pm_data:/var/lib/postgresql/data
-      - ./db/migrations/V1__init_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-      - ./db/seeds/01_roles_permissions.sql:/docker-entrypoint-initdb.d/02_roles_permissions.sql:ro
-      - ./db/seeds/02_demo_data.sql:/docker-entrypoint-initdb.d/03_demo_data.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pm_user -d project_manager"]
-      interval: 5s
-      retries: 10
-
   api:
     build: ./backend
     container_name: project_manager_api
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://pm_user:pm_password@db:5432/project_manager
-      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-64-char-secret}
+      DATABASE_URL: postgresql+asyncpg://pm_user:${PM_DB_PASSWORD:?Thiếu PM_DB_PASSWORD trong .env}@${PM_DB_HOST:-carbon_analyst_db}:5432/project_manager
+      SECRET_KEY: ${SECRET_KEY:?Thiếu SECRET_KEY trong .env}
     ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
+      - "${PM_BIND_ADDR:-0.0.0.0}:${PM_API_PORT:-8000}:8000"
+    networks:
+      - default
+      - shared-db
 
   web:
     build:
@@ -37,10 +20,14 @@ services:
       args:
         BACKEND_URL: http://api:8000
     container_name: project_manager_web
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PM_BIND_ADDR:-0.0.0.0}:${PM_WEB_PORT:-3000}:3000"
     depends_on:
       - api
 
-volumes:
-  pm_data:
+networks:
+  # Mạng docker-compose của ai_carbon_analyst (chứa container PostgreSQL)
+  shared-db:
+    external: true
+    name: ${PM_DB_NETWORK:-ai_carbon_analyst_default}

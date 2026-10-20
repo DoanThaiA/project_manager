@@ -9,6 +9,28 @@ frontend/    Giao diện Next.js 16 + Tailwind 4 + TanStack Query
 docs/        Tài liệu thiết kế database
 ```
 
+## Database: dùng chung PostgreSQL với ai_carbon_analyst
+
+Không chạy PostgreSQL riêng. Dự án dùng **server của `ai_carbon_analyst`** (container `carbon_analyst_db`, PG 16)
+nhưng tách biệt hoàn toàn:
+
+- Database riêng `project_manager`, user riêng `pm_user` (không phải superuser, không CONNECT được vào `carbon_analyst`).
+- Múi giờ đặt riêng cho database: `Asia/Ho_Chi_Minh` (server chạy UTC).
+- Từ máy host: `localhost:5433` (chỉ localhost). API trong Docker nối qua mạng `ai_carbon_analyst_default`.
+- Mật khẩu `pm_user` nằm trong `.env` ở thư mục gốc (`PM_DB_PASSWORD`, không commit).
+
+Khởi tạo lần đầu (cần `carbon_analyst_db` đang chạy):
+
+```bash
+cp .env.example .env            # điền PM_DB_PASSWORD, SECRET_KEY (giá trị ngẫu nhiên)
+./scripts/init_db.sh --demo     # tạo user + database, chạy schema + seed (+ dữ liệu mẫu)
+```
+
+Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
+`docker compose exec api python -m app.cli create-admin --username admin --email … --full-name "…"`
+
+Script chỉ chạy schema khi database còn trống, không xoá dữ liệu có sẵn.
+
 ## Chạy nhanh bằng Docker
 
 ```bash
@@ -17,21 +39,16 @@ docker compose up -d --build
 
 - Giao diện: http://localhost:3000
 - API: http://localhost:8000 · Swagger: http://localhost:8000/docs
-- PostgreSQL: `localhost:5435`, user `pm_user` / `pm_password`, db `project_manager`
 - Tài khoản mẫu (mật khẩu `Demo@123`): `admin`, `po.an` (PO), `sm.binh` (Scrum Master), `dev.cuong` (Dev), `qa.dung` (Tester), `kh.abc` (khách hàng)
-
-Lần khởi động đầu, database tự chạy `db/migrations/V1__init_schema.sql` → `db/seeds/01_roles_permissions.sql` → `db/seeds/02_demo_data.sql`.
-Khởi tạo lại từ đầu: `docker compose down -v && docker compose up -d --build`
 
 ## Chạy backend khi phát triển
 
 ```bash
-docker compose up -d db
 cd backend
-cp .env.example .env
+cp .env.example .env    # điền mật khẩu PM_DB_PASSWORD vào DATABASE_URL
 uv sync
 uv run uvicorn app.main:app --reload
-uv run pytest          # test tích hợp, tự tạo DB project_manager_test
+uv run pytest          # tự tạo lại DB project_manager_test trên cùng server; có chốt chặn không chạy trên DB dev
 uvx ruff check app tests
 ```
 

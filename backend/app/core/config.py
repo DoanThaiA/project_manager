@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
 
-    database_url: str = "postgresql+asyncpg://pm_user:pm_password@localhost:5435/project_manager"
+    # Server PostgreSQL dùng chung với ai_carbon_analyst (cổng 5433, chỉ localhost); mật khẩu đặt qua .env
+    database_url: str = "postgresql+asyncpg://pm_user:CHANGE_ME@localhost:5433/project_manager"
 
     secret_key: str = "change-me-to-a-random-64-char-secret"
     algorithm: str = "HS256"

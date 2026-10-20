@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: project_manager_db
+    environment:
+      POSTGRES_DB: project_manager
+      POSTGRES_USER: pm_user
+      POSTGRES_PASSWORD: pm_password
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "5435:5432"
+    volumes:
+      - pm_data:/var/lib/postgresql/data
+      - ./db/migrations/V1__init_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/seeds/01_roles_permissions.sql:/docker-entrypoint-initdb.d/02_roles_permissions.sql:ro
+      - ./db/seeds/02_demo_data.sql:/docker-entrypoint-initdb.d/03_demo_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pm_user -d project_manager"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    container_name: project_manager_api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pm_user:pm_password@db:5432/project_manager
+      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-64-char-secret}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://api:8000
+    container_name: project_manager_web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pm_data:

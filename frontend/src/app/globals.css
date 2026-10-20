@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* Design tokens: nền trung tính, điểm nhấn indigo, mật độ thông tin cao như công cụ quản lý dự án */
+@theme {
+  --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-subtle: #f1f3f6;
+  --color-line: #e3e6eb;
+  --color-line-strong: #cfd4dc;
+  --color-ink: #161a22;
+  --color-ink-2: #4a5160;
+  --color-ink-3: #7b8394;
+
+  --color-brand: #4f46e5;
+  --color-brand-hover: #4338ca;
+  --color-brand-soft: #eef0ff;
+
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+
+  --radius-card: 10px;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-pop: 0 12px 32px -8px rgb(16 24 40 / 0.22), 0 2px 6px rgb(16 24 40 / 0.08);
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

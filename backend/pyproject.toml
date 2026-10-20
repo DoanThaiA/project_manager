@@ -1,0 +1,37 @@
+[project]
+name = "project-manager-api"
+version = "0.1.0"
+description = "API quản lý dự án phần mềm theo Scrum/Agile"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.32.0",
+    "bcrypt>=5.0.0",
+    "fastapi>=0.151.0",
+    "pydantic-settings>=2.16.0",
+    "pydantic[email]>=2.14.1",
+    "pyjwt>=2.15.1",
+    "python-multipart>=0.0.32",
+    "sqlalchemy[asyncio]>=2.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["B008"]  # Depends(...) trong default là chuẩn FastAPI

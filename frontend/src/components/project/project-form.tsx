@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -21,8 +22,9 @@ export function ProjectFormModal({ project, onClose }: { project?: Project; onCl
   const qc = useQueryClient();
   const toast = useToast();
   const router = useRouter();
-  const { can } = useAuth();
+  const { can, me } = useAuth();
   const editing = !!project;
+  const [deleting, setDeleting] = useState(false);
   const members = useMembers(project?.id ?? 0);
 
   const [form, setForm] = useState({
@@ -102,6 +104,16 @@ export function ProjectFormModal({ project, onClose }: { project?: Project; onCl
       title={editing ? `Sửa dự án ${project.key}` : "Dự án mới"}
       footer={
         <>
+          {editing && me?.is_system_admin && (
+            <Button
+              variant="ghost"
+              className="mr-auto text-danger hover:bg-danger-soft hover:text-danger"
+              icon={<Trash2 className="size-4" />}
+              onClick={() => setDeleting(true)}
+            >
+              Xoá dự án
+            </Button>
+          )}
           <Button onClick={onClose}>Huỷ</Button>
           <Button
             variant="primary"
@@ -189,6 +201,73 @@ export function ProjectFormModal({ project, onClose }: { project?: Project; onCl
           )}
         </Field>
       </div>
+      {deleting && project && (
+        <DeleteProjectModal
+          project={project}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => {
+            onClose();
+            router.push("/projects");
+          }}
+        />
+      )}
+    </Modal>
+  );
+}
+
+/** Xác nhận xoá dự án (chỉ quản trị hệ thống): phải gõ đúng mã dự án. */
+function DeleteProjectModal({
+  project,
+  onClose,
+  onDeleted,
+}: {
+  project: Project;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [typed, setTyped] = useState("");
+
+  const remove = useMutation({
+    mutationFn: () => api.delete(`/projects/${project.id}`),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: ["project", project.id] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      toast.success(`Đã xoá dự án ${project.key}`);
+      onDeleted();
+    },
+    onError: toast.error,
+  });
+
+  return (
+    <Modal
+      open
+      size="sm"
+      onClose={onClose}
+      title={`Xoá dự án ${project.key}?`}
+      footer={
+        <>
+          <Button onClick={onClose}>Huỷ</Button>
+          <Button
+            variant="danger"
+            icon={<Trash2 className="size-4" />}
+            loading={remove.isPending}
+            disabled={typed.trim().toUpperCase() !== project.key}
+            onClick={() => remove.mutate()}
+          >
+            Xoá dự án
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-ink-2">
+        Dự án <strong>{project.name}</strong> cùng toàn bộ yêu cầu, backlog, sprint, log công việc sẽ bị ẩn khỏi hệ
+        thống với mọi người dùng. Dữ liệu vẫn được giữ trong database (xoá mềm) và nhật ký hoạt động.
+      </p>
+      <Field label={`Gõ mã dự án "${project.key}" để xác nhận`} className="mt-4">
+        {(id) => <Input id={id} autoFocus autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />}
+      </Field>
     </Modal>
   );
 }

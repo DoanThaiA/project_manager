@@ -1,7 +1,20 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text, func
+from sqlalchemy import (
+    BigInteger,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, pg_enum
@@ -10,9 +23,11 @@ from app.models.enums import ProjectStatus, SprintStatus
 
 class Project(TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "projects"
+    # Mã dự án chỉ duy nhất giữa các dự án chưa xoá: xoá mềm xong có thể tạo lại dự án cùng mã (migration 0003)
+    __table_args__ = (Index("uq_projects_key_active", "key", unique=True, postgresql_where=text("deleted_at IS NULL")),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    key: Mapped[str] = mapped_column(String(10), unique=True)
+    key: Mapped[str] = mapped_column(String(10))
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
     customer_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("customers.id"))

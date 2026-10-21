@@ -15,6 +15,16 @@ export const CATEGORIES: { key: AttachmentCategory; label: string; hint: string 
   { key: "result", label: "Ảnh sau khi sửa", hint: "Kết quả sau khi sửa xong" },
 ];
 export const CATEGORY_LABEL: Record<AttachmentCategory, string> = { bug: "Ảnh lỗi", result: "Ảnh sau khi sửa" };
+
+/** Dấu ảnh trong văn bản (Mô tả / Tiêu chí hoàn thành), mỗi dấu một dòng: [Ảnh lỗi: tên file] */
+export const imageMarker = (category: AttachmentCategory, name: string) => `[${CATEGORY_LABEL[category]}: ${name}]`;
+const MARKER_RE = new RegExp(`^\\[(${Object.values(CATEGORY_LABEL).join("|")}): (.+)\\]$`);
+export function parseImageMarker(line: string): { category: AttachmentCategory; name: string } | null {
+  const m = MARKER_RE.exec(line);
+  if (!m) return null;
+  const category = (Object.keys(CATEGORY_LABEL) as AttachmentCategory[]).find((c) => CATEGORY_LABEL[c] === m[1])!;
+  return { category, name: m[2] };
+}
 const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
 const MAX_MB = 10;
 
@@ -152,7 +162,10 @@ export function useWorkItemImages({
     return [...saved, ...local];
   }
 
-  return { canEdit, add, uploadPending, thumbs };
+  /** Ảnh (đã lưu hoặc đang chờ tải) theo tên file — để hiển thị trong ô văn bản. */
+  const find = (category: AttachmentCategory, name: string) => thumbs(category).find((t) => t.name === name);
+
+  return { canEdit, add, uploadPending, thumbs, find };
 }
 
 /** Khu "Hình ảnh": hai cột Ảnh lỗi / Ảnh sau khi sửa. */

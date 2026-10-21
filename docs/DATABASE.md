@@ -42,7 +42,7 @@ erDiagram
 | | `user_roles` | Vai trò cấp hệ thống của user |
 | | `project_members` | Thành viên + vai trò trong từng dự án (1 người nhiều vai trò được) |
 | Khách hàng | `customers`, `customer_contacts` | Thông tin khách hàng, người liên hệ (tối đa 1 đầu mối chính) |
-| Dự án | `projects` | `key` (ERP, CRM…) làm tiền tố mã, PO, Scrum Master, độ dài sprint, ngân sách giờ |
+| Dự án | `projects` | `key` (ERP, CRM…) làm tiền tố mã, duy nhất giữa các dự án chưa xoá (xoá mềm xong dùng lại được; mã yêu cầu / công việc duy nhất trong dự án — revision 0003), PO, Scrum Master, độ dài sprint, ngân sách giờ |
 | | `sprints` | Sprint goal, ngày, capacity, ghi chú Review/Retrospective |
 | Yêu cầu KH | `requirements` | Mã tự sinh `ERP-REQ-0001`, loại, nguồn, ưu tiên, trạng thái, tiêu chí nghiệm thu, ngày mong muốn/cam kết, duyệt/từ chối |
 | | `requirement_comments` | Trao đổi; `is_internal` để ẩn với khách hàng |

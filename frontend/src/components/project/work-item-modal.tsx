@@ -4,11 +4,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { CATEGORY_LABEL, useWorkItemImages, WorkItemImages } from "@/components/project/work-item-images";
+import { ImageTextEditor } from "@/components/project/image-text-editor";
+import {
+  CATEGORY_LABEL,
+  imageMarker,
+  useWorkItemImages,
+  WorkItemImages,
+} from "@/components/project/work-item-images";
 import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -45,8 +51,11 @@ type FormState = {
 
 // Ảnh dán vào Mô tả -> Ảnh lỗi, vào Tiêu chí hoàn thành -> Ảnh sau khi sửa; văn bản giữ dấu [Ảnh lỗi: tên file]
 const IMAGE_FIELD = { bug: "description", result: "acceptance_criteria" } as const;
-const imageMarker = (category: AttachmentCategory, name: string) => `[${CATEGORY_LABEL[category]}: ${name}]`;
-const withoutMarker = (text: string, marker: string) => text.split(`${marker}\n`).join("").split(marker).join("");
+const withoutMarker = (text: string, marker: string) =>
+  text
+    .split("\n")
+    .filter((line) => line !== marker)
+    .join("\n");
 
 const str = (v: unknown) => (v == null ? "" : String(num(v)));
 const numOrNull = (v: string) => (v === "" ? null : Number(v));
@@ -102,38 +111,6 @@ export function WorkItemModal({
     },
   });
 
-  /** Dán / kéo thả ảnh vào ô văn bản: thêm vào nhóm ảnh tương ứng và chèn dấu tại con trỏ. */
-  const imagePaste = (category: AttachmentCategory) => {
-    const field = IMAGE_FIELD[category];
-    const insert = (el: HTMLTextAreaElement, files: File[]) => {
-      const names = images.add(files, category);
-      if (!names.length) return;
-      const { value, selectionStart, selectionEnd } = el;
-      const before = value.slice(0, selectionStart);
-      const after = value.slice(selectionEnd);
-      // Mỗi dấu ảnh nằm trên một dòng riêng
-      const markers = names.map((n) => imageMarker(category, n)).join("\n");
-      const head = before + (before && !before.endsWith("\n") ? "\n" : "") + markers;
-      const tail = (after && !after.startsWith("\n") ? "\n" : "") + after;
-      set(field, head + tail);
-      requestAnimationFrame(() => el.setSelectionRange(head.length, head.length));
-    };
-    return {
-      onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-        // Có chữ kèm theo (copy từ Word, trang web...) thì dán chữ như bình thường
-        const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
-        if (!files.length || e.clipboardData.getData("text/plain")) return;
-        e.preventDefault();
-        insert(e.currentTarget, files);
-      },
-      onDrop: (e: React.DragEvent<HTMLTextAreaElement>) => {
-        const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
-        if (!files.length) return;
-        e.preventDefault();
-        insert(e.currentTarget, files);
-      },
-    };
-  };
   const pasteHint = (category: AttachmentCategory) =>
     canEdit ? `Dán ảnh (Ctrl+V) hoặc kéo thả ảnh vào đây để thêm vào "${CATEGORY_LABEL[category]}"` : undefined;
 
@@ -252,23 +229,27 @@ export function WorkItemModal({
           </Field>
           <Field label="Mô tả" hint={pasteHint("bug")} className="sm:col-span-6">
             {(id) => (
-              <Textarea
+              <ImageTextEditor
                 id={id}
                 rows={4}
                 value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-                {...imagePaste("bug")}
+                onChange={(v) => set("description", v)}
+                category="bug"
+                images={images}
+                editable={canEdit}
               />
             )}
           </Field>
           <Field label="Tiêu chí hoàn thành" hint={pasteHint("result")} className="sm:col-span-6">
             {(id) => (
-              <Textarea
+              <ImageTextEditor
                 id={id}
                 rows={2}
                 value={form.acceptance_criteria}
-                onChange={(e) => set("acceptance_criteria", e.target.value)}
-                {...imagePaste("result")}
+                onChange={(v) => set("acceptance_criteria", v)}
+                category="result"
+                images={images}
+                editable={canEdit}
               />
             )}
           </Field>

@@ -59,7 +59,8 @@ chmod 600 .env
 ```
 
 Script tạo `pm_user` + database `project_manager`, đặt múi giờ `Asia/Ho_Chi_Minh` cho riêng database này,
-chạy schema và seed vai trò/quyền. Chạy lại an toàn: nếu đã có schema thì bỏ qua.
+rồi chạy migration Alembic (`alembic upgrade head`: schema + seed vai trò/quyền) trong container API.
+Chạy lại an toàn: migration đã áp thì bỏ qua.
 
 Nên chặn `pm_user` khỏi database của carbon (superuser `postgres` của carbon không bị ảnh hưởng —
 kiểm tra trước carbon không có user đăng nhập nào khác ngoài `postgres`):
@@ -141,8 +142,17 @@ git pull
 docker compose up -d --build
 ```
 
-Khi có migration mới (`db/migrations/V2__…sql`), chạy trước khi build:
-`docker exec -i <container> psql -v ON_ERROR_STOP=1 -U pm_user -d project_manager < db/migrations/V2__….sql`
+Migration mới (Alembic, `backend/migrations/versions/`) tự chạy khi container API khởi động
+(`alembic upgrade head`); migration lỗi thì API không lên, xem `docker compose logs api`.
+Nên backup database (mục 7) trước khi cập nhật bản có migration. Xem / chạy tay:
+
+```bash
+docker compose exec api alembic current      # phiên bản đang dùng
+docker compose run --rm api alembic upgrade head
+```
+
+Database tạo trước khi chuyển sang Alembic không cần làm gì thêm: revision `0001` thấy đã có schema thì
+chỉ ghi nhận phiên bản, `0002` dùng `IF NOT EXISTS`.
 
 ## Xử lý sự cố
 
@@ -153,6 +163,7 @@ Khi có migration mới (`db/migrations/V2__…sql`), chạy trước khi build:
 | `Bind for 127.0.0.1:3000 failed: port is already allocated` | Đổi `PM_WEB_PORT` / `PM_API_PORT` |
 | API log: `password authentication failed for user "pm_user"` | `PM_DB_PASSWORD` khác mật khẩu lúc chạy `init_db.sh` → đặt lại: `docker exec <container> psql -U postgres -c "ALTER ROLE pm_user PASSWORD '<PM_DB_PASSWORD>'"` |
 | API log: `could not translate host name "postgres"` | Sai `PM_DB_HOST` hoặc API chưa vào đúng mạng — thử tên container |
+| API log: `alembic ... Error` rồi container restart liên tục | Migration lỗi — `docker compose logs api`, sửa rồi `docker compose up -d --build api`; cần thì khôi phục backup |
 | Nginx 502 | `web` chưa chạy hoặc sai cổng trong `proxy_pass` — `docker compose ps`, `curl 127.0.0.1:$PM_WEB_PORT/login` |
 
 Xem log: `docker compose logs -f --tail=100 api web`

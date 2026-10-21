@@ -1,4 +1,4 @@
-"""Khớp 1-1 với các ENUM trong db/migrations/V1__init_schema.sql."""
+"""Khớp 1-1 với các ENUM trong migrations/sql/0001_init_schema.sql."""
 
 from enum import StrEnum
 

@@ -1,6 +1,6 @@
 # Thiết kế Database – Quản lý dự án phần mềm (Scrum/Agile)
 
-PostgreSQL 16 · Schema: `db/migrations/V1__init_schema.sql`
+PostgreSQL 16 · Migration: Alembic (`backend/migrations/`) · Schema gốc: `backend/migrations/sql/0001_init_schema.sql`
 
 ## 1. Sơ đồ quan hệ (ERD)
 
@@ -50,7 +50,7 @@ erDiagram
 | Backlog | `work_items` | Epic/Story/Task/Bug/Subtask, mã `ERP-12`, story point, ước lượng giờ, `sprint_id NULL` = Product Backlog |
 | Log | `work_logs` | **Log công việc**: ai, ngày nào, bao nhiêu giờ, làm gì, cho task/yêu cầu nào |
 | | `activity_logs` | **Log hoạt động (audit)**: ai đổi gì, lúc nào, giá trị cũ/mới (JSONB), IP |
-| Khác | `attachments` | File đính kèm cho yêu cầu / công việc / bình luận / sprint; ảnh lưu trên Cloudflare Images. Ảnh công việc có `category`: `bug` (ảnh lỗi) / `result` (ảnh sau khi sửa) — V2 |
+| Khác | `attachments` | File đính kèm cho yêu cầu / công việc / bình luận / sprint; ảnh lưu trên Cloudflare Images. Ảnh công việc có `category`: `bug` (ảnh lỗi) / `result` (ảnh sau khi sửa) — revision 0002 |
 
 ## 3. Luồng trạng thái yêu cầu khách hàng
 

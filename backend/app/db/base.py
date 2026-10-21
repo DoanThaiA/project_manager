@@ -7,8 +7,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    """Model ánh xạ vào schema có sẵn (db/migrations/*.sql).
-    Schema được quản lý bằng SQL, KHÔNG dùng metadata.create_all()."""
+    """Model ánh xạ vào schema do Alembic quản lý (backend/migrations), KHÔNG dùng metadata.create_all().
+    Đổi model thì tạo migration: alembic revision --autogenerate -m "..." rồi đọc lại."""
 
     # Lấy giá trị do trigger sinh ra (code, seq_no, updated_at...) ngay qua RETURNING
     __mapper_args__ = {"eager_defaults": True}

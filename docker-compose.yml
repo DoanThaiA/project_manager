@@ -1,5 +1,5 @@
 # Database dùng chung server PostgreSQL của ai_carbon_analyst, database riêng `project_manager`,
-# user riêng `pm_user`. Khởi tạo lần đầu: scripts/init_db.sh. Cấu hình trong .env (xem .env.example).
+# user riêng `pm_user`. Khởi tạo lần đầu: scripts/init_db.sh; API tự chạy alembic upgrade head khi khởi động. Cấu hình trong .env (xem .env.example).
 services:
   api:
     build: ./backend

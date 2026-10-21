@@ -15,7 +15,9 @@ class Attachment(Base):
     project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"))
     entity_type: Mapped[str] = mapped_column(String(30))
     entity_id: Mapped[int] = mapped_column(BigInteger)
-    category: Mapped[str | None] = mapped_column(String(20))
+    category: Mapped[str | None] = mapped_column(
+        String(20), comment="bug: ảnh chụp lỗi; result: ảnh kết quả sau khi sửa"
+    )
     file_name: Mapped[str] = mapped_column(String(255))
     storage_key: Mapped[str] = mapped_column(String(500))
     mime_type: Mapped[str | None] = mapped_column(String(100))

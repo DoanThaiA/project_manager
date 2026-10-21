@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "API quản lý dự án phần mềm theo Scrum/Agile"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.0",
     "asyncpg>=0.32.0",
     "bcrypt>=5.0.0",
     "fastapi>=0.151.0",

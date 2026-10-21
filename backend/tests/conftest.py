@@ -1,10 +1,11 @@
 """Test tích hợp trên PostgreSQL thật.
 
-Mỗi lần chạy: tạo lại database `project_manager_test` từ db/migrations + db/seeds, trên cùng
+Mỗi lần chạy: tạo lại database `project_manager_test` bằng Alembic (upgrade head) + db/seeds, trên cùng
 server với DATABASE_URL (PostgreSQL dùng chung với ai_carbon_analyst; pm_user có quyền CREATEDB).
 Tài khoản mẫu: mật khẩu Demo@123.
 """
 
+import asyncio
 import os
 from pathlib import Path
 from urllib.parse import quote
@@ -35,12 +36,7 @@ def _server_dsn() -> str:
 PG_DSN = _server_dsn()
 os.environ["DATABASE_URL"] = PG_DSN.replace("postgresql://", "postgresql+asyncpg://") + f"/{TEST_DB}"
 
-ROOT = Path(__file__).resolve().parents[2]
-SQL_FILES = [
-    *sorted((ROOT / "db/migrations").glob("V*.sql"), key=lambda p: int(p.name[1:].split("__")[0])),
-    ROOT / "db/seeds/01_roles_permissions.sql",
-    ROOT / "db/seeds/02_demo_data.sql",
-]
+DEMO_SEED = BACKEND.parent / "db/seeds/02_demo_data.sql"
 PASSWORD = "Demo@123"
 
 
@@ -52,9 +48,14 @@ async def database():
     await admin.execute(f"ALTER DATABASE {TEST_DB} SET timezone TO 'Asia/Ho_Chi_Minh'")
     await admin.close()
 
+    from alembic import command
+    from alembic.config import Config
+
+    # env.py tự gọi asyncio.run -> chạy trong thread riêng để không đụng event loop của pytest
+    await asyncio.to_thread(command.upgrade, Config(BACKEND / "alembic.ini"), "head")
+
     conn = await asyncpg.connect(f"{PG_DSN}/{TEST_DB}")
-    for path in SQL_FILES:
-        await conn.execute(path.read_text())
+    await conn.execute(DEMO_SEED.read_text())
     await conn.close()
     yield
 

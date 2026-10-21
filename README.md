@@ -3,8 +3,8 @@
 Hệ thống quản lý dự án phần mềm theo Scrum/Agile: yêu cầu khách hàng, backlog, sprint, log công việc, log hoạt động.
 
 ```
-db/          SQL schema (nguồn chuẩn) + seed
-backend/     API FastAPI + SQLAlchemy 2 async
+db/seeds/    Dữ liệu mẫu cho dev
+backend/     API FastAPI + SQLAlchemy 2 async; migration Alembic ở backend/migrations
 frontend/    Giao diện Next.js 16 + Tailwind 4 + TanStack Query
 docs/        Tài liệu thiết kế database
 ```
@@ -23,13 +23,13 @@ Khởi tạo lần đầu (cần `carbon_analyst_db` đang chạy):
 
 ```bash
 cp .env.example .env            # điền PM_DB_PASSWORD, SECRET_KEY (giá trị ngẫu nhiên)
-./scripts/init_db.sh --demo     # tạo user + database, chạy schema + seed (+ dữ liệu mẫu)
+./scripts/init_db.sh --demo     # tạo user + database, chạy migration Alembic (+ dữ liệu mẫu)
 ```
 
 Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
 `docker compose exec api python -m app.cli create-admin --username admin --email … --full-name "…"`
 
-Script chỉ chạy schema khi database còn trống, không xoá dữ liệu có sẵn.
+Script không xoá dữ liệu có sẵn; dữ liệu mẫu chỉ nạp khi database còn trống.
 
 ## Chạy nhanh bằng Docker
 
@@ -47,10 +47,30 @@ docker compose up -d --build
 cd backend
 cp .env.example .env    # điền mật khẩu PM_DB_PASSWORD vào DATABASE_URL
 uv sync
+uv run alembic upgrade head   # áp migration lên database dev
 uv run uvicorn app.main:app --reload
 uv run pytest          # tự tạo lại DB project_manager_test trên cùng server; có chốt chặn không chạy trên DB dev
-uvx ruff check app tests
+uvx ruff check app tests migrations
 ```
+
+### Migration database (Alembic)
+
+Schema do Alembic quản lý trong `backend/migrations/`. Revision `0001` là schema gốc viết bằng SQL
+(`migrations/sql/`: hàm, trigger, view, seed vai trò/quyền). Container API tự chạy `alembic upgrade head`
+mỗi lần khởi động.
+
+```bash
+cd backend
+uv run alembic revision --autogenerate -m "them cot x"   # sinh từ thay đổi model, ĐỌC LẠI trước khi chạy
+uv run alembic revision -m "them trigger y"              # viết tay (op.execute(...)) cho trigger/view/dữ liệu
+uv run alembic upgrade head                              # áp lên database dev
+uv run alembic downgrade -1                              # quay lại 1 bước
+uv run alembic current / history                         # xem phiên bản
+uv run pytest                                            # test tạo DB mới bằng upgrade head
+```
+
+Autogenerate chỉ so sánh bảng / cột / index có khai báo trong model. Nó bỏ qua khoá ngoại, trigger, view
+và những gì chỉ có trong SQL, vì vậy các thay đổi này phải tự viết trong migration.
 
 ## Chạy frontend khi phát triển
 

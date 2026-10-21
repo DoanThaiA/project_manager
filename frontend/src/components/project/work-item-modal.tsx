@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { type PendingImage, uploadImage, WorkItemImages } from "@/components/project/work-item-images";
+import { CATEGORY_LABEL, useWorkItemImages, WorkItemImages } from "@/components/project/work-item-images";
 import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,16 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useMembers, useProjectPerms } from "@/lib/hooks";
 import { ACTIVITY_TYPE, PRIORITY, WORK_ITEM_STATUS, WORK_ITEM_TYPE } from "@/lib/labels";
-import type { Page, Priority, Requirement, WorkItem, WorkItemStatus, WorkItemType, WorkLog } from "@/lib/types";
+import type {
+  AttachmentCategory,
+  Page,
+  Priority,
+  Requirement,
+  WorkItem,
+  WorkItemStatus,
+  WorkItemType,
+  WorkLog,
+} from "@/lib/types";
 import { fmtDate, fmtHours, num } from "@/lib/utils";
 
 type FormState = {
@@ -33,6 +42,11 @@ type FormState = {
   assignee_id: number | null;
   due_date: string;
 };
+
+// Ảnh dán vào Mô tả -> Ảnh lỗi, vào Tiêu chí hoàn thành -> Ảnh sau khi sửa; văn bản giữ dấu [Ảnh lỗi: tên file]
+const IMAGE_FIELD = { bug: "description", result: "acceptance_criteria" } as const;
+const imageMarker = (category: AttachmentCategory, name: string) => `[${CATEGORY_LABEL[category]}: ${name}]`;
+const withoutMarker = (text: string, marker: string) => text.split(`${marker}\n`).join("").split(marker).join("");
 
 const str = (v: unknown) => (v == null ? "" : String(num(v)));
 const numOrNull = (v: string) => (v === "" ? null : Number(v));
@@ -75,10 +89,53 @@ export function WorkItemModal({
   const { byId } = useMembers(pid);
   const [form, setForm] = useState<FormState>(() => initial(item, defaults));
   const [logOpen, setLogOpen] = useState(false);
-  const [images, setImages] = useState<PendingImage[]>([]);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const editing = !!item;
   const canEdit = editing ? can("work_item.update") : can("work_item.create");
+  const images = useWorkItemImages({
+    pid,
+    itemId: item?.id,
+    canEdit,
+    onRemoved: (name, category) => {
+      const field = IMAGE_FIELD[category];
+      setForm((f) => ({ ...f, [field]: withoutMarker(f[field], imageMarker(category, name)) }));
+    },
+  });
+
+  /** Dán / kéo thả ảnh vào ô văn bản: thêm vào nhóm ảnh tương ứng và chèn dấu tại con trỏ. */
+  const imagePaste = (category: AttachmentCategory) => {
+    const field = IMAGE_FIELD[category];
+    const insert = (el: HTMLTextAreaElement, files: File[]) => {
+      const names = images.add(files, category);
+      if (!names.length) return;
+      const { value, selectionStart, selectionEnd } = el;
+      const before = value.slice(0, selectionStart);
+      const after = value.slice(selectionEnd);
+      // Mỗi dấu ảnh nằm trên một dòng riêng
+      const markers = names.map((n) => imageMarker(category, n)).join("\n");
+      const head = before + (before && !before.endsWith("\n") ? "\n" : "") + markers;
+      const tail = (after && !after.startsWith("\n") ? "\n" : "") + after;
+      set(field, head + tail);
+      requestAnimationFrame(() => el.setSelectionRange(head.length, head.length));
+    };
+    return {
+      onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        // Có chữ kèm theo (copy từ Word, trang web...) thì dán chữ như bình thường
+        const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+        if (!files.length || e.clipboardData.getData("text/plain")) return;
+        e.preventDefault();
+        insert(e.currentTarget, files);
+      },
+      onDrop: (e: React.DragEvent<HTMLTextAreaElement>) => {
+        const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+        if (!files.length) return;
+        e.preventDefault();
+        insert(e.currentTarget, files);
+      },
+    };
+  };
+  const pasteHint = (category: AttachmentCategory) =>
+    canEdit ? `Dán ảnh (Ctrl+V) hoặc kéo thả ảnh vào đây để thêm vào "${CATEGORY_LABEL[category]}"` : undefined;
 
   const requirements = useQuery({
     queryKey: ["project", pid, "requirements", "open-for-link"],
@@ -128,10 +185,8 @@ export function WorkItemModal({
       }
       const created = (await api.post<WorkItem>(`/projects/${pid}/work-items`, body)).data;
       // Ảnh chọn trong lúc tạo: tải lên sau khi có công việc; lỗi ảnh không làm hỏng việc tạo
-      const failed = (
-        await Promise.allSettled(images.map((img) => uploadImage(pid, created.id, img.file, img.category)))
-      ).filter((r) => r.status === "rejected");
-      if (failed.length) toast.error(`${created.code}: ${failed.length} ảnh tải lên lỗi — mở lại công việc để thử lại`);
+      const failed = await images.uploadPending(created.id);
+      if (failed) toast.error(`${created.code}: ${failed} ảnh tải lên lỗi — mở lại công việc để thử lại`);
       return created;
     },
     onSuccess: (saved) => {
@@ -195,18 +250,25 @@ export function WorkItemModal({
           <Field label="Tiêu đề" required className="sm:col-span-4">
             {(id) => <Input id={id} autoFocus={!editing} value={form.title} onChange={(e) => set("title", e.target.value)} />}
           </Field>
-          <Field label="Mô tả" className="sm:col-span-6">
+          <Field label="Mô tả" hint={pasteHint("bug")} className="sm:col-span-6">
             {(id) => (
-              <Textarea id={id} rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} />
+              <Textarea
+                id={id}
+                rows={4}
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+                {...imagePaste("bug")}
+              />
             )}
           </Field>
-          <Field label="Tiêu chí hoàn thành" className="sm:col-span-6">
+          <Field label="Tiêu chí hoàn thành" hint={pasteHint("result")} className="sm:col-span-6">
             {(id) => (
               <Textarea
                 id={id}
                 rows={2}
                 value={form.acceptance_criteria}
                 onChange={(e) => set("acceptance_criteria", e.target.value)}
+                {...imagePaste("result")}
               />
             )}
           </Field>
@@ -299,13 +361,7 @@ export function WorkItemModal({
           </Field>
         </fieldset>
 
-        <WorkItemImages
-          pid={pid}
-          itemId={item?.id}
-          canEdit={canEdit}
-          pending={images}
-          onPendingChange={setImages}
-        />
+        <WorkItemImages images={images} />
 
         {editing && logs.data && (
           <section className="mt-6">

@@ -8,6 +8,11 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://pm_user:${PM_DB_PASSWORD:?Thiếu PM_DB_PASSWORD trong .env}@${PM_DB_HOST:-carbon_analyst_db}:5432/project_manager
       SECRET_KEY: ${SECRET_KEY:?Thiếu SECRET_KEY trong .env}
+      # Cloudflare Images lưu ảnh đính kèm công việc (xem docs/DEPLOY.md)
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
+      CF_IMAGES_TOKEN: ${CF_IMAGES_TOKEN:-}
+      CF_IMAGES_ACCOUNT_HASH: ${CF_IMAGES_ACCOUNT_HASH:-}
+      CF_IMAGES_SIGNING_KEY: ${CF_IMAGES_SIGNING_KEY:-}
     ports:
       - "${PM_BIND_ADDR:-0.0.0.0}:${PM_API_PORT:-8000}:8000"
     networks:

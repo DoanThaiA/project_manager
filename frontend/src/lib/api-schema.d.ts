@@ -675,6 +675,41 @@ export interface paths {
         patch: operations["update_work_item_api_v1_projects__project_id__work_items__item_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/work-items/{item_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ảnh đính kèm của công việc */
+        get: operations["list_attachments_api_v1_projects__project_id__work_items__item_id__attachments_get"];
+        put?: never;
+        /** Tải ảnh lên Cloudflare Images (ảnh lỗi / ảnh kết quả) */
+        post: operations["upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/work-items/{item_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xoá ảnh */
+        delete: operations["delete_attachment_api_v1_projects__project_id__work_items__item_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/work-logs": {
         parameters: {
             query?: never;
@@ -817,6 +852,35 @@ export interface components {
             /** Message */
             message: string | null;
         };
+        /**
+         * AttachmentCategory
+         * @description Phân loại ảnh đính kèm công việc (cột attachments.category, CHECK constraint, không phải ENUM).
+         * @enum {string}
+         */
+        AttachmentCategory: "bug" | "result";
+        /** AttachmentOut */
+        AttachmentOut: {
+            /** Id */
+            id: number;
+            /** Entity Id */
+            entity_id: number;
+            category: components["schemas"]["AttachmentCategory"] | null;
+            /** File Name */
+            file_name: string;
+            /** Mime Type */
+            mime_type: string | null;
+            /** Size Bytes */
+            size_bytes: number | null;
+            /** Uploaded By */
+            uploaded_by: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Url */
+            url: string;
+        };
         /** Body_login_api_v1_auth_login_post */
         Body_login_api_v1_auth_login_post: {
             /** Grant Type */
@@ -840,6 +904,12 @@ export interface components {
              * Format: password
              */
             client_secret?: string | null;
+        };
+        /** Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post */
+        Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post: {
+            /** File */
+            file: string;
+            category: components["schemas"]["AttachmentCategory"];
         };
         /** CommentCreate */
         CommentCreate: {
@@ -4190,6 +4260,105 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkItemOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attachments_api_v1_projects__project_id__work_items__item_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_attachment_api_v1_projects__project_id__work_items__item_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+                attachment_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

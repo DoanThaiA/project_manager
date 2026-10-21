@@ -1,3 +1,4 @@
+from app.models.attachment import Attachment
 from app.models.customer import Customer, CustomerContact
 from app.models.project import Project, ProjectMember, Sprint
 from app.models.requirement import Requirement, RequirementComment, RequirementStatusHistory
@@ -6,6 +7,7 @@ from app.models.work import ActivityLog, WorkItem, WorkLog
 
 __all__ = [
     "ActivityLog",
+    "Attachment",
     "Customer",
     "CustomerContact",
     "Permission",

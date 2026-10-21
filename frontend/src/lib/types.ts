@@ -32,6 +32,8 @@ export type Comment = S["CommentOut"];
 export type WorkItem = S["WorkItemOut"];
 export type WorkItemCreate = S["WorkItemCreate"];
 export type WorkLog = S["WorkLogOut"];
+export type Attachment = S["AttachmentOut"];
+export type AttachmentCategory = NonNullable<Attachment["category"]>;
 export type WorkLogSummaryRow = S["WorkLogSummaryRow"];
 export type ActivityLog = S["ActivityLogOut"];
 

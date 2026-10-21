@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { type PendingImage, uploadImage, WorkItemImages } from "@/components/project/work-item-images";
 import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ export function WorkItemModal({
   const { byId } = useMembers(pid);
   const [form, setForm] = useState<FormState>(() => initial(item, defaults));
   const [logOpen, setLogOpen] = useState(false);
+  const [images, setImages] = useState<PendingImage[]>([]);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const editing = !!item;
   const canEdit = editing ? can("work_item.update") : can("work_item.create");
@@ -124,7 +126,13 @@ export function WorkItemModal({
         );
         return (await api.patch<WorkItem>(`/projects/${pid}/work-items/${item.id}`, changed)).data;
       }
-      return (await api.post<WorkItem>(`/projects/${pid}/work-items`, body)).data;
+      const created = (await api.post<WorkItem>(`/projects/${pid}/work-items`, body)).data;
+      // Ảnh chọn trong lúc tạo: tải lên sau khi có công việc; lỗi ảnh không làm hỏng việc tạo
+      const failed = (
+        await Promise.allSettled(images.map((img) => uploadImage(pid, created.id, img.file, img.category)))
+      ).filter((r) => r.status === "rejected");
+      if (failed.length) toast.error(`${created.code}: ${failed.length} ảnh tải lên lỗi — mở lại công việc để thử lại`);
+      return created;
     },
     onSuccess: (saved) => {
       invalidate();
@@ -290,6 +298,14 @@ export function WorkItemModal({
             {(id) => <Input id={id} type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)} />}
           </Field>
         </fieldset>
+
+        <WorkItemImages
+          pid={pid}
+          itemId={item?.id}
+          canEdit={canEdit}
+          pending={images}
+          onPendingChange={setImages}
+        />
 
         {editing && logs.data && (
           <section className="mt-6">

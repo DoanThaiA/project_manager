@@ -46,6 +46,7 @@ python3 -c "import secrets; print('PM_DB_PASSWORD=' + secrets.token_urlsafe(24))
 | `PM_DB_NETWORK` | tên mạng ở bước 1 |
 | `PG_CONTAINER` | tên container ở bước 1 |
 | `PM_BIND_ADDR` | `127.0.0.1` — chỉ nginx truy cập được, không lộ cổng ra Internet |
+| `PM_WEB_PORT`, `PM_API_PORT` | cổng còn trống, vd `3100`, `8100` — carbon thường đã dùng 3000/8000 (`ss -ltnp \| grep -E ':(3000\|8000)'`) |
 
 ```bash
 chmod 600 .env
@@ -109,6 +110,30 @@ sudo certbot --nginx -d pm.congty.vn
 
 Khôi phục: `docker exec -i <container> pg_restore -U pm_user -d project_manager --clean < /backup/pm_YYYY-MM-DD.dump`
 
+## 8. Lưu ảnh trên Cloudflare Images
+
+Ảnh đính kèm công việc (ảnh chụp lỗi / ảnh kết quả sau khi sửa) được API tải lên Cloudflare Images;
+database chỉ lưu image id (bảng `attachments`). Chưa cấu hình thì tính năng tải ảnh trả lỗi 503,
+phần còn lại vẫn chạy bình thường. Cloudflare Images cần gói trả phí (Images Paid).
+
+1. Cloudflare Dashboard › **Images** › **Overview**: bật Images, ghi lại **Account ID** và **Account hash**.
+2. **My Profile › API Tokens › Create Token › Custom token**: quyền *Account › Cloudflare Images › Edit*.
+3. Chọn chế độ hiển thị:
+   - **Riêng tư (khuyên dùng — ảnh lỗi hay chứa dữ liệu khách hàng):** **Images › Keys** › copy key →
+     đặt `CF_IMAGES_SIGNING_KEY`. Ảnh tải lên với `requireSignedURLs`, API trả link ký tạm hết hạn sau 1 giờ.
+   - **Public:** để trống `CF_IMAGES_SIGNING_KEY` — ai có link `imagedelivery.net/...` đều xem được.
+   Đổi chế độ chỉ áp dụng cho ảnh tải lên **sau** khi đổi.
+4. Điền vào `.env` rồi `docker compose up -d --build api`:
+
+| Biến | Giá trị |
+|---|---|
+| `CF_ACCOUNT_ID`, `CF_IMAGES_ACCOUNT_HASH` | từ bước 1 |
+| `CF_IMAGES_TOKEN` | token ở bước 2 |
+| `CF_IMAGES_SIGNING_KEY` | key ở bước 3, hoặc để trống |
+
+Giới hạn: ảnh PNG / JPEG / GIF / WebP, tối đa 10 MB mỗi ảnh (`ATTACHMENT_MAX_MB`). Ảnh hiển thị qua
+variant `public` (có sẵn mặc định, đổi bằng `CF_IMAGES_VARIANT`).
+
 ## Cập nhật phiên bản
 
 ```bash
@@ -118,6 +143,19 @@ docker compose up -d --build
 
 Khi có migration mới (`db/migrations/V2__…sql`), chạy trước khi build:
 `docker exec -i <container> psql -v ON_ERROR_STOP=1 -U pm_user -d project_manager < db/migrations/V2__….sql`
+
+## Xử lý sự cố
+
+| Triệu chứng | Nguyên nhân / cách xử lý |
+|---|---|
+| `network ai_carbon_analyst_default declared as external, but could not be found` | Sai `PM_DB_NETWORK` — lấy đúng tên từ `docker network ls` |
+| `Thiếu PM_DB_PASSWORD trong .env` | Chạy `docker compose` ngoài thư mục dự án, hoặc `.env` thiếu biến |
+| `Bind for 127.0.0.1:3000 failed: port is already allocated` | Đổi `PM_WEB_PORT` / `PM_API_PORT` |
+| API log: `password authentication failed for user "pm_user"` | `PM_DB_PASSWORD` khác mật khẩu lúc chạy `init_db.sh` → đặt lại: `docker exec <container> psql -U postgres -c "ALTER ROLE pm_user PASSWORD '<PM_DB_PASSWORD>'"` |
+| API log: `could not translate host name "postgres"` | Sai `PM_DB_HOST` hoặc API chưa vào đúng mạng — thử tên container |
+| Nginx 502 | `web` chưa chạy hoặc sai cổng trong `proxy_pass` — `docker compose ps`, `curl 127.0.0.1:$PM_WEB_PORT/login` |
+
+Xem log: `docker compose logs -f --tail=100 api web`
 
 ## Lưu ý
 

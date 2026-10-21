@@ -33,7 +33,7 @@ if [[ "$(psql_pm -Atc "SELECT to_regclass('public.projects') IS NOT NULL")" == "
 fi
 
 echo "→ Chạy schema + seed"
-psql_pm < "$ROOT/db/migrations/V1__init_schema.sql"
+for f in $(ls "$ROOT"/db/migrations/V*.sql | sort -V); do psql_pm < "$f"; done
 psql_pm < "$ROOT/db/seeds/01_roles_permissions.sql"
 if [[ "${1:-}" == "--demo" ]]; then
   psql_pm < "$ROOT/db/seeds/02_demo_data.sql"

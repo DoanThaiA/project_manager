@@ -50,7 +50,7 @@ erDiagram
 | Backlog | `work_items` | Epic/Story/Task/Bug/Subtask, mã `ERP-12`, story point, ước lượng giờ, `sprint_id NULL` = Product Backlog |
 | Log | `work_logs` | **Log công việc**: ai, ngày nào, bao nhiêu giờ, làm gì, cho task/yêu cầu nào |
 | | `activity_logs` | **Log hoạt động (audit)**: ai đổi gì, lúc nào, giá trị cũ/mới (JSONB), IP |
-| Khác | `attachments` | File đính kèm cho yêu cầu / công việc / bình luận / sprint |
+| Khác | `attachments` | File đính kèm cho yêu cầu / công việc / bình luận / sprint; ảnh lưu trên Cloudflare Images. Ảnh công việc có `category`: `bug` (ảnh lỗi) / `result` (ảnh sau khi sửa) — V2 |
 
 ## 3. Luồng trạng thái yêu cầu khách hàng
 

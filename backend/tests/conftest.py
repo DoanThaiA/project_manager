@@ -37,7 +37,7 @@ os.environ["DATABASE_URL"] = PG_DSN.replace("postgresql://", "postgresql+asyncpg
 
 ROOT = Path(__file__).resolve().parents[2]
 SQL_FILES = [
-    ROOT / "db/migrations/V1__init_schema.sql",
+    *sorted((ROOT / "db/migrations").glob("V*.sql"), key=lambda p: int(p.name[1:].split("__")[0])),
     ROOT / "db/seeds/01_roles_permissions.sql",
     ROOT / "db/seeds/02_demo_data.sql",
 ]

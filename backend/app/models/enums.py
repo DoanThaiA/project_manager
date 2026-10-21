@@ -102,3 +102,10 @@ class WorkActivityType(StrEnum):
     support = "support"
     documentation = "documentation"
     other = "other"
+
+
+class AttachmentCategory(StrEnum):
+    """Phân loại ảnh đính kèm công việc (cột attachments.category, CHECK constraint, không phải ENUM)."""
+
+    bug = "bug"  # ảnh chụp lỗi
+    result = "result"  # ảnh kết quả sau khi sửa

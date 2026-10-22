@@ -12,10 +12,134 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, clean } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { Contact, ContactOcr, Customer, Page } from "@/lib/types";
+import type { Contact, ContactOcr, Customer, CustomerOcr, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const STATUS = { active: { label: "Hoạt động", tone: "green" as const }, inactive: { label: "Ngừng", tone: "gray" as const } };
+
+const CARD_MAX_BYTES = 1024 * 1024; // OCR.space gói miễn phí: 1 MB / ảnh
+
+/** Thu nhỏ ảnh chụp (thường vài MB) thành JPEG dưới 1 MB trước khi gửi OCR. */
+async function shrinkImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  for (const quality of [0.9, 0.8, 0.7, 0.55, 0.4]) {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (blob && blob.size <= CARD_MAX_BYTES) return blob;
+  }
+  throw new Error("Ảnh quá lớn, hãy chụp lại gần hơn hoặc cắt bớt");
+}
+
+/**
+ * Chọn / chụp / kéo thả / dán ảnh danh thiếp, gửi OCR tới `url` rồi trả kết quả để điền form.
+ * `onResult` trả về true nếu điền được ít nhất một ô.
+ */
+function CardScanner<T extends { text: string }>({
+  url,
+  label,
+  onResult,
+}: {
+  url: string;
+  label: string;
+  onResult: (r: T) => boolean;
+}) {
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+  const scan = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("file", await shrinkImage(file), "card.jpg");
+      return (await api.post<T>(url, body)).data;
+    },
+    onSuccess: (r) => {
+      if (onResult(r)) toast.success("Đã điền từ ảnh, kiểm tra lại trước khi lưu");
+      else toast.error("Không nhận ra thông tin trên ảnh, hãy nhập tay");
+    },
+    onError: toast.error,
+  });
+  const pick = (files: Iterable<File>) => {
+    const file = Array.from(files).find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+    setPreview(URL.createObjectURL(file));
+    scan.mutate(file);
+  };
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={scan.isPending}
+        onClick={() => input.current?.click()}
+        onPaste={(e) => {
+          if (e.clipboardData.files.length) {
+            e.preventDefault();
+            pick(e.clipboardData.files);
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          pick(e.dataTransfer.files);
+        }}
+        title="Bấm để chọn / chụp ảnh, kéo thả, hoặc bấm vào ô rồi Ctrl+V để dán ảnh"
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg border border-dashed border-line-strong p-3 text-left",
+          "text-sm text-ink-3 transition-colors hover:border-brand hover:text-brand focus:border-brand focus:text-brand",
+          "disabled:cursor-wait",
+          over && "border-brand bg-brand-soft text-brand",
+        )}
+      >
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh blob cục bộ
+          <img src={preview} alt="Danh thiếp" className="h-14 w-24 shrink-0 rounded object-cover" />
+        ) : (
+          <span className="grid h-14 w-24 shrink-0 place-items-center rounded bg-subtle">
+            <ScanLine className="size-6" />
+          </span>
+        )}
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 font-medium text-ink-2">
+            {scan.isPending && <Loader2 className="size-4 animate-spin" />}
+            {scan.isPending ? "Đang đọc ảnh…" : label}
+          </span>
+          <span className="block text-xs">Chọn / chụp ảnh, kéo thả hoặc dán (Ctrl+V)</span>
+        </span>
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          pick(e.target.files ?? []);
+          e.target.value = "";
+        }}
+      />
+      {scan.data?.text && (
+        <details className="text-xs text-ink-3">
+          <summary className="cursor-pointer select-none">Chữ đọc được từ ảnh</summary>
+          <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-subtle p-2 font-sans whitespace-pre-wrap">
+            {scan.data.text}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function CustomerModal({ customer, onClose }: { customer?: Customer; onClose: () => void }) {
   const qc = useQueryClient();
@@ -82,6 +206,23 @@ function CustomerModal({ customer, onClose }: { customer?: Customer; onClose: ()
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
+        {!editing && (
+          <div className="sm:col-span-2">
+            <CardScanner<CustomerOcr>
+              url="/customers/ocr"
+              label="Quét danh thiếp / giấy tờ công ty để tự điền"
+              onResult={(r) => {
+                const found = Object.fromEntries(
+                  (["name", "tax_code", "email", "phone", "address", "website"] as const)
+                    .filter((k) => r[k])
+                    .map((k) => [k, r[k]!]),
+                );
+                setForm((f) => ({ ...f, ...found }));
+                return Object.keys(found).length > 0;
+              }}
+            />
+          </div>
+        )}
         {text("code", "Mã khách hàng", { required: true })}
         {text("tax_code", "Mã số thuế")}
         {text("name", "Tên khách hàng", { required: true, span: true })}
@@ -104,120 +245,6 @@ function CustomerModal({ customer, onClose }: { customer?: Customer; onClose: ()
         </Field>
       </div>
     </Modal>
-  );
-}
-
-const CARD_MAX_BYTES = 1024 * 1024; // OCR.space gói miễn phí: 1 MB / ảnh
-
-/** Thu nhỏ ảnh chụp (thường vài MB) thành JPEG dưới 1 MB trước khi gửi OCR. */
-async function shrinkImage(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  for (const quality of [0.9, 0.8, 0.7, 0.55, 0.4]) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size <= CARD_MAX_BYTES) return blob;
-  }
-  throw new Error("Ảnh quá lớn, hãy chụp lại gần hơn hoặc cắt bớt");
-}
-
-/** Chọn / chụp / kéo thả / dán ảnh danh thiếp, OCR rồi trả kết quả để điền form. */
-function CardScanner({ customerId, onResult }: { customerId: number; onResult: (r: ContactOcr) => void }) {
-  const toast = useToast();
-  const input = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [over, setOver] = useState(false);
-  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
-  const scan = useMutation({
-    mutationFn: async (file: File) => {
-      const body = new FormData();
-      body.append("file", await shrinkImage(file), "card.jpg");
-      return (await api.post<ContactOcr>(`/customers/${customerId}/contacts/ocr`, body)).data;
-    },
-    onSuccess: (r) => {
-      onResult(r);
-      if (r.full_name || r.email || r.phone) toast.success("Đã điền từ danh thiếp, kiểm tra lại trước khi lưu");
-      else toast.error("Không nhận ra thông tin trên ảnh, hãy nhập tay");
-    },
-    onError: toast.error,
-  });
-  const pick = (files: Iterable<File>) => {
-    const file = Array.from(files).find((f) => f.type.startsWith("image/"));
-    if (!file) return;
-    setPreview(URL.createObjectURL(file));
-    scan.mutate(file);
-  };
-
-  return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        disabled={scan.isPending}
-        onClick={() => input.current?.click()}
-        onPaste={(e) => {
-          if (e.clipboardData.files.length) {
-            e.preventDefault();
-            pick(e.clipboardData.files);
-          }
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setOver(true);
-        }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setOver(false);
-          pick(e.dataTransfer.files);
-        }}
-        title="Bấm để chọn / chụp ảnh, kéo thả, hoặc bấm vào ô rồi Ctrl+V để dán ảnh"
-        className={cn(
-          "flex w-full items-center gap-3 rounded-lg border border-dashed border-line-strong p-3 text-left",
-          "text-sm text-ink-3 transition-colors hover:border-brand hover:text-brand focus:border-brand focus:text-brand",
-          "disabled:cursor-wait",
-          over && "border-brand bg-brand-soft text-brand",
-        )}
-      >
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element -- ảnh blob cục bộ
-          <img src={preview} alt="Danh thiếp" className="h-14 w-24 shrink-0 rounded object-cover" />
-        ) : (
-          <span className="grid h-14 w-24 shrink-0 place-items-center rounded bg-subtle">
-            <ScanLine className="size-6" />
-          </span>
-        )}
-        <span className="min-w-0">
-          <span className="flex items-center gap-1.5 font-medium text-ink-2">
-            {scan.isPending && <Loader2 className="size-4 animate-spin" />}
-            {scan.isPending ? "Đang đọc danh thiếp…" : "Quét danh thiếp để tự điền"}
-          </span>
-          <span className="block text-xs">Chọn / chụp ảnh, kéo thả hoặc dán (Ctrl+V)</span>
-        </span>
-      </button>
-      <input
-        ref={input}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        hidden
-        onChange={(e) => {
-          pick(e.target.files ?? []);
-          e.target.value = "";
-        }}
-      />
-      {scan.data?.text && (
-        <details className="text-xs text-ink-3">
-          <summary className="cursor-pointer select-none">Chữ đọc được từ ảnh</summary>
-          <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-subtle p-2 font-sans whitespace-pre-wrap">
-            {scan.data.text}
-          </pre>
-        </details>
-      )}
-    </div>
   );
 }
 
@@ -286,17 +313,19 @@ function ContactModal({ customer, contact, onClose }: { customer: Customer; cont
       >
         {!editing && (
           <div className="sm:col-span-2">
-            <CardScanner
-              customerId={customer.id}
-              onResult={(r) =>
+            <CardScanner<ContactOcr>
+              url={`/customers/${customer.id}/contacts/ocr`}
+              label="Quét danh thiếp để tự điền"
+              onResult={(r) => {
                 setForm((f) => ({
                   ...f,
                   full_name: r.full_name ?? f.full_name,
                   position: r.position ?? f.position,
                   email: r.email ?? f.email,
                   phone: r.phone ?? f.phone,
-                }))
-              }
+                }));
+                return !!(r.full_name || r.position || r.email || r.phone);
+              }}
             />
           </div>
         )}

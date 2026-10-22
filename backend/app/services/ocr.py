@@ -1,4 +1,4 @@
-"""Đọc danh thiếp bằng OCR.space (https://ocr.space/ocrapi) rồi tách họ tên, chức vụ, email, điện thoại."""
+"""Đọc danh thiếp bằng OCR.space (https://ocr.space/ocrapi) rồi tách thông tin người liên hệ / khách hàng."""
 
 import re
 
@@ -17,6 +17,16 @@ _LABEL = re.compile(
     re.IGNORECASE,
 )
 _VN_MOBILE = re.compile(r"^(0|84)(3|5|7|8|9)\d{8}$")
+_WEBSITE = re.compile(r"(https?://|www\.)[^\s,;]+", re.IGNORECASE)
+_TAX_CODE = re.compile(
+    r"(?:mst|mã số thuế|mã số dn|mã số doanh nghiệp|msdn|tax code|tax id|vat)\s*[:.\-]?\s*"
+    r"(\d[\d\s]{8,}\d(?:\s*-\s*\d{3})?)",
+    re.IGNORECASE,
+)
+_ADDRESS_LABEL = re.compile(
+    r"^\s*(địa chỉ|đ/c|đc|address|addr|add|trụ sở( chính)?|văn phòng|vp|office|head office)\s*[:.\-]\s*",
+    re.IGNORECASE,
+)
 
 _POSITION_WORDS = (
     "giám đốc", "phó", "trưởng", "chủ tịch", "tổng", "quản lý", "kế toán", "nhân viên", "chuyên viên", "thư ký",
@@ -70,7 +80,8 @@ async def read_text(data: bytes, file_name: str, content_type: str) -> str:
 
 def _has(line: str, words: tuple[str, ...]) -> bool:
     low = line.lower()
-    return any(re.search(rf"(?<!\w){re.escape(w)}(?!\w)", low) for w in words)
+    # "tp." phải khớp cả "TP.HCM" nên chỉ chặn chữ dính sau khi từ khoá kết thúc bằng chữ cái
+    return any(re.search(rf"(?<!\w){re.escape(w)}{'(?!\\w)' if w[-1].isalnum() else ''}", low) for w in words)
 
 
 def _looks_like_name(line: str) -> bool:
@@ -83,26 +94,33 @@ def _looks_like_name(line: str) -> bool:
     )
 
 
-def _pick_phone(lines: list[str]) -> str | None:
+def _lines(text: str) -> list[str]:
+    lines = [re.sub(r"\s+", " ", ln).strip(" |•·,;") for ln in text.splitlines()]
+    return [ln for ln in lines if ln]
+
+
+def _pick_email(lines: list[str]) -> str | None:
+    return next((m.group().lower() for ln in lines if (m := _EMAIL.search(ln))), None)
+
+
+def _pick_phone(lines: list[str], prefer_mobile: bool = True) -> str | None:
     found: list[str] = []
     for line in lines:
-        if "fax" in line.lower():
+        if "fax" in line.lower() or _TAX_CODE.search(line):
             continue
         for m in _PHONE.finditer(_LABEL.sub("", line)):
             digits = re.sub(r"\D", "", m.group())
-            if 9 <= len(digits) <= 13:
+            if 9 <= len(digits) <= 13 or re.fullmatch(r"1[89]00\d{4}", digits):  # tổng đài 1900 / 1800
                 found.append(m.group().strip(" .-"))
     mobile = next((p for p in found if _VN_MOBILE.match(re.sub(r"\D", "", p))), None)
-    phone = mobile or (found[0] if found else None)
+    phone = (mobile if prefer_mobile else None) or (found[0] if found else None)
     return phone[:30] if phone else None
 
 
 def parse_card(text: str) -> dict[str, str | None]:
     """Đoán các trường người liên hệ từ chữ OCR của danh thiếp. Chỉ là gợi ý, người dùng sửa lại trước khi lưu."""
-    lines = [re.sub(r"\s+", " ", ln).strip(" |•·,;") for ln in text.splitlines()]
-    lines = [ln for ln in lines if ln]
-
-    email = next((m.group().lower() for ln in lines if (m := _EMAIL.search(ln))), None)
+    lines = _lines(text)
+    email = _pick_email(lines)
     phone = _pick_phone(lines)
     company = next((ln for ln in lines if _has(ln, _COMPANY_WORDS)), None)
 
@@ -130,4 +148,42 @@ def parse_card(text: str) -> dict[str, str | None]:
         "email": email,
         "phone": phone,
         "company": company,
+    }
+
+
+def _pick_website(lines: list[str]) -> str | None:
+    for ln in lines:
+        if m := _WEBSITE.search(ln):
+            return m.group().rstrip(".")[:255]
+    # Tên miền trần ("abc.com.vn"), bỏ qua dòng email
+    return next((m.group() for ln in lines if "@" not in ln and (m := _URL.search(ln))), None)
+
+
+def _pick_address(lines: list[str], skip: set[str]) -> str | None:
+    labelled = [_ADDRESS_LABEL.sub("", ln) for ln in lines if _ADDRESS_LABEL.match(ln)]
+    guessed = [
+        ln
+        for ln in lines
+        if ln not in skip and len(ln) > 10 and _has(ln, _ADDRESS_WORDS) and not _EMAIL.search(ln)
+        and not _WEBSITE.search(ln) and not _PHONE.search(_LABEL.sub("", ln))
+    ]  # fmt: skip
+    address = next((a for a in labelled if a), None) or (guessed[0] if guessed else None)
+    return address.strip(" ,") if address else None
+
+
+def parse_company(text: str) -> dict[str, str | None]:
+    """Đoán thông tin khách hàng (doanh nghiệp) từ chữ OCR của danh thiếp / giấy tờ công ty. Chỉ là gợi ý."""
+    lines = _lines(text)
+    tax = next((m for ln in lines if (m := _TAX_CODE.search(ln))), None)
+    tax_code = re.sub(r"\s", "", tax.group(1))[:30] if tax else None
+    companies = [ln for ln in lines if _has(ln, _COMPANY_WORDS) and not _TAX_CODE.search(ln)]
+    # Tên công ty thường không kèm số (dòng có số hay là địa chỉ chi nhánh / văn phòng)
+    name = next((ln for ln in companies if not re.search(r"\d", ln)), companies[0] if companies else None)
+    return {
+        "name": name[:255] if name else None,
+        "tax_code": tax_code,
+        "email": _pick_email(lines),
+        "phone": _pick_phone(lines, prefer_mobile=False),
+        "address": _pick_address(lines, skip={name} if name else set()),
+        "website": _pick_website(lines),
     }

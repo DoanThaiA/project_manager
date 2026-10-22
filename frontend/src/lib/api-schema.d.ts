@@ -283,6 +283,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/ocr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đọc ảnh danh thiếp / giấy tờ công ty (OCR.space) để gợi ý thông tin khách hàng */
+        post: operations["ocr_customer_card_api_v1_customers_ocr_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{customer_id}": {
         parameters: {
             query?: never;
@@ -927,6 +944,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_ocr_customer_card_api_v1_customers_ocr_post */
+        Body_ocr_customer_card_api_v1_customers_ocr_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post */
         Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post: {
             /** File */
@@ -1059,6 +1081,26 @@ export interface components {
             note?: string | null;
             /** Code */
             code: string;
+        };
+        /**
+         * CustomerOcrOut
+         * @description Gợi ý điền form khách hàng từ ảnh danh thiếp / giấy tờ công ty.
+         */
+        CustomerOcrOut: {
+            /** Name */
+            name: string | null;
+            /** Tax Code */
+            tax_code: string | null;
+            /** Email */
+            email: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Address */
+            address: string | null;
+            /** Website */
+            website: string | null;
+            /** Text */
+            text: string;
         };
         /** CustomerOut */
         CustomerOut: {
@@ -2950,6 +2992,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ocr_customer_card_api_v1_customers_ocr_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_ocr_customer_card_api_v1_customers_ocr_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerOcrOut"];
                 };
             };
             /** @description Validation Error */

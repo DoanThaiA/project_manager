@@ -72,6 +72,18 @@ class ContactOut(ORMModel):
     is_primary: bool
 
 
+class CustomerOcrOut(BaseModel):
+    """Gợi ý điền form khách hàng từ ảnh danh thiếp / giấy tờ công ty."""
+
+    name: str | None
+    tax_code: str | None
+    email: str | None
+    phone: str | None
+    address: str | None
+    website: str | None
+    text: str
+
+
 class ContactOcrOut(BaseModel):
     """Gợi ý điền form người liên hệ từ ảnh danh thiếp."""
 

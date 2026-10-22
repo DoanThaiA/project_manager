@@ -14,6 +14,7 @@ export type RoleDetail = S["RoleDetail"];
 export type Permission = S["PermissionOut"];
 
 export type Customer = S["CustomerOut"];
+export type CustomerOcr = S["CustomerOcrOut"];
 export type Contact = S["ContactOut"];
 export type ContactOcr = S["ContactOcrOut"];
 

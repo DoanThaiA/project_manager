@@ -1,6 +1,7 @@
 import pytest
 
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 CARD = """CÔNG TY CỔ PHẦN PHẦN MỀM XYZ
 TRẦN THỊ BÍCH NGỌC
@@ -9,6 +10,13 @@ Tầng 5, 123 Nguyễn Huệ, Quận 1, TP.HCM
 T: (028) 3823 4567 - M: +84 903 123 456
 Fax: 028 3823 4568
 E: Ngoc.Tran@xyz.com.vn"""
+
+COMPANY = """CÔNG TY TNHH THƯƠNG MẠI AN PHÁT
+MST: 0312 345 678
+Địa chỉ: 45 Lê Lợi, P. Bến Nghé, Q.1, TP.HCM
+Hotline: 1900 1234
+Email: info@anphat.vn
+www.anphat.vn"""
 
 
 @pytest.fixture
@@ -25,7 +33,7 @@ def fake_ocr(monkeypatch):
 
     async def read_text(data, file_name, content_type):
         calls.append((file_name, content_type))
-        return CARD
+        return COMPANY if data.startswith(PNG) else CARD
 
     monkeypatch.setattr(ocr, "read_text", read_text)
     return calls
@@ -49,6 +57,28 @@ def test_parse_card():
         "company": "ABC Group",
     }
     assert parse_card("") == dict.fromkeys(("full_name", "position", "email", "phone", "company"))
+
+
+def test_parse_company():
+    from app.services.ocr import parse_company
+
+    assert parse_company(COMPANY) == {
+        "name": "CÔNG TY TNHH THƯƠNG MẠI AN PHÁT",
+        "tax_code": "0312345678",  # không nhầm sang số điện thoại
+        "email": "info@anphat.vn",
+        "phone": "1900 1234",
+        "address": "45 Lê Lợi, P. Bến Nghé, Q.1, TP.HCM",
+        "website": "www.anphat.vn",
+    }
+    # Danh thiếp cá nhân: lấy số bàn công ty, địa chỉ không nhãn
+    assert parse_company(CARD) == {
+        "name": "CÔNG TY CỔ PHẦN PHẦN MỀM XYZ",
+        "tax_code": None,
+        "email": "ngoc.tran@xyz.com.vn",
+        "phone": "(028) 3823 4567",
+        "address": "Tầng 5, 123 Nguyễn Huệ, Quận 1, TP.HCM",
+        "website": None,
+    }
 
 
 async def test_contact_crud(client, login, customer_id):
@@ -104,3 +134,19 @@ async def test_ocr_card_validation(client, login, customer_id, fake_ocr, monkeyp
     staff = await client.post(url, files={"file": ("card.jpg", JPEG, "image/jpeg")}, headers=await login("dev.cuong"))
     assert staff.status_code == 403
     assert fake_ocr == []
+
+
+async def test_ocr_customer(client, login, fake_ocr):
+    resp = await client.post(
+        "/customers/ocr", files={"file": ("card.png", PNG, "image/png")}, headers=await login("po.an")
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["name"] == "CÔNG TY TNHH THƯƠNG MẠI AN PHÁT" and body["tax_code"] == "0312345678"
+    assert body["text"] == COMPANY
+
+    staff = await client.post(
+        "/customers/ocr", files={"file": ("card.png", PNG, "image/png")}, headers=await login("dev.cuong")
+    )
+    assert staff.status_code == 403
+    assert fake_ocr == [("card.png", "image/png")]

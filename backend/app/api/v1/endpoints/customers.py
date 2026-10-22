@@ -14,6 +14,7 @@ from app.schemas.customer import (
     ContactOut,
     ContactUpdate,
     CustomerCreate,
+    CustomerOcrOut,
     CustomerOut,
     CustomerUpdate,
 )
@@ -44,6 +45,19 @@ async def _clear_primary(db: AsyncSession, customer_id: int, keep_id: int | None
     await db.execute(stmt.values(is_primary=False))
 
 
+async def _ocr_upload(file: UploadFile) -> str:
+    """Kiểm tra ảnh tải lên rồi gửi OCR.space, trả về chữ đọc được."""
+    max_bytes = settings.ocr_max_kb * 1024
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Ảnh vượt quá {settings.ocr_max_kb} KB")
+    detected = storage.detect_image(data)
+    if detected is None:
+        raise HTTPException(status_code=422, detail="Chỉ nhận ảnh PNG, JPEG, GIF hoặc WebP")
+    mime, ext = detected
+    return await ocr.read_text(data, f"card.{ext}", mime)
+
+
 @router.get("", response_model=Page[CustomerOut])
 async def list_customers(
     q: str | None = Query(default=None, description="Tìm theo mã, tên, email"),
@@ -72,6 +86,19 @@ async def create_customer(
     db.add(customer)
     await db.commit()
     return customer
+
+
+@router.post(
+    "/ocr",
+    response_model=CustomerOcrOut,
+    summary="Đọc ảnh danh thiếp / giấy tờ công ty (OCR.space) để gợi ý thông tin khách hàng",
+)
+async def ocr_customer_card(
+    file: UploadFile = File(...),
+    _: User = Depends(require_permission("customer.create")),
+):
+    text = await _ocr_upload(file)
+    return CustomerOcrOut(**ocr.parse_company(text), text=text)
 
 
 @router.get("/{customer_id}", response_model=CustomerOut)
@@ -150,15 +177,7 @@ async def ocr_contact_card(
     db: AsyncSession = Depends(get_db),
 ):
     await _get_customer(db, customer_id)
-    max_bytes = settings.ocr_max_kb * 1024
-    data = await file.read(max_bytes + 1)
-    if len(data) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"Ảnh vượt quá {settings.ocr_max_kb} KB")
-    detected = storage.detect_image(data)
-    if detected is None:
-        raise HTTPException(status_code=422, detail="Chỉ nhận ảnh PNG, JPEG, GIF hoặc WebP")
-    mime, ext = detected
-    text = await ocr.read_text(data, f"card.{ext}", mime)
+    text = await _ocr_upload(file)
     return ContactOcrOut(**ocr.parse_card(text), text=text)
 
 

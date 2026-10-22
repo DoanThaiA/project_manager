@@ -320,6 +320,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/{customer_id}/contacts/ocr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đọc ảnh danh thiếp (OCR.space) để gợi ý thông tin người liên hệ */
+        post: operations["ocr_contact_card_api_v1_customers__customer_id__contacts_ocr_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{customer_id}/contacts/{contact_id}": {
         parameters: {
             query?: never;
@@ -905,6 +922,11 @@ export interface components {
              */
             client_secret?: string | null;
         };
+        /** Body_ocr_contact_card_api_v1_customers__customer_id__contacts_ocr_post */
+        Body_ocr_contact_card_api_v1_customers__customer_id__contacts_ocr_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post */
         Body_upload_attachment_api_v1_projects__project_id__work_items__item_id__attachments_post: {
             /** File */
@@ -970,6 +992,24 @@ export interface components {
              * @default false
              */
             is_primary: boolean;
+        };
+        /**
+         * ContactOcrOut
+         * @description Gợi ý điền form người liên hệ từ ảnh danh thiếp.
+         */
+        ContactOcrOut: {
+            /** Full Name */
+            full_name: string | null;
+            /** Position */
+            position: string | null;
+            /** Email */
+            email: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Company */
+            company: string | null;
+            /** Text */
+            text: string;
         };
         /** ContactOut */
         ContactOut: {
@@ -3071,6 +3111,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ocr_contact_card_api_v1_customers__customer_id__contacts_ocr_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_ocr_contact_card_api_v1_customers__customer_id__contacts_ocr_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOcrOut"];
                 };
             };
             /** @description Validation Error */

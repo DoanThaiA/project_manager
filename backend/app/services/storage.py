@@ -13,6 +13,24 @@ from app.core.config import settings
 _API = "https://api.cloudflare.com/client/v4/accounts/{account}/images/v1"
 _DELIVERY = "https://imagedelivery.net"
 
+# Chữ ký đầu file -> (mime, đuôi). Không nhận SVG (có thể chứa script).
+_IMAGE_SIGNATURES = [
+    (b"\x89PNG\r\n\x1a\n", "image/png", "png"),
+    (b"\xff\xd8\xff", "image/jpeg", "jpg"),
+    (b"GIF87a", "image/gif", "gif"),
+    (b"GIF89a", "image/gif", "gif"),
+]
+
+
+def detect_image(data: bytes) -> tuple[str, str] | None:
+    """Nhận dạng ảnh theo nội dung (không tin Content-Type), trả về (mime, đuôi)."""
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp", "webp"
+    for magic, mime, ext in _IMAGE_SIGNATURES:
+        if data.startswith(magic):
+            return mime, ext
+    return None
+
 
 def is_configured() -> bool:
     return all((settings.cf_account_id, settings.cf_images_token, settings.cf_images_account_hash))

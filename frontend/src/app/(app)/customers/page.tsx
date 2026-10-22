@@ -1,8 +1,8 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail, Pencil, Phone, Plus, Search, Star, Trash2 } from "lucide-react";
-import { useDeferredValue, useState } from "react";
+import { Loader2, Mail, Pencil, Phone, Plus, ScanLine, Search, Star, Trash2, UserPlus } from "lucide-react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 
 import { MetaBadge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, clean } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { Contact, Customer, Page } from "@/lib/types";
+import type { Contact, ContactOcr, Customer, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const STATUS = { active: { label: "Hoạt động", tone: "green" as const }, inactive: { label: "Ngừng", tone: "gray" as const } };
@@ -107,23 +107,223 @@ function CustomerModal({ customer, onClose }: { customer?: Customer; onClose: ()
   );
 }
 
+const CARD_MAX_BYTES = 1024 * 1024; // OCR.space gói miễn phí: 1 MB / ảnh
+
+/** Thu nhỏ ảnh chụp (thường vài MB) thành JPEG dưới 1 MB trước khi gửi OCR. */
+async function shrinkImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  for (const quality of [0.9, 0.8, 0.7, 0.55, 0.4]) {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (blob && blob.size <= CARD_MAX_BYTES) return blob;
+  }
+  throw new Error("Ảnh quá lớn, hãy chụp lại gần hơn hoặc cắt bớt");
+}
+
+/** Chọn / chụp / kéo thả / dán ảnh danh thiếp, OCR rồi trả kết quả để điền form. */
+function CardScanner({ customerId, onResult }: { customerId: number; onResult: (r: ContactOcr) => void }) {
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+  const scan = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("file", await shrinkImage(file), "card.jpg");
+      return (await api.post<ContactOcr>(`/customers/${customerId}/contacts/ocr`, body)).data;
+    },
+    onSuccess: (r) => {
+      onResult(r);
+      if (r.full_name || r.email || r.phone) toast.success("Đã điền từ danh thiếp, kiểm tra lại trước khi lưu");
+      else toast.error("Không nhận ra thông tin trên ảnh, hãy nhập tay");
+    },
+    onError: toast.error,
+  });
+  const pick = (files: Iterable<File>) => {
+    const file = Array.from(files).find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+    setPreview(URL.createObjectURL(file));
+    scan.mutate(file);
+  };
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={scan.isPending}
+        onClick={() => input.current?.click()}
+        onPaste={(e) => {
+          if (e.clipboardData.files.length) {
+            e.preventDefault();
+            pick(e.clipboardData.files);
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          pick(e.dataTransfer.files);
+        }}
+        title="Bấm để chọn / chụp ảnh, kéo thả, hoặc bấm vào ô rồi Ctrl+V để dán ảnh"
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg border border-dashed border-line-strong p-3 text-left",
+          "text-sm text-ink-3 transition-colors hover:border-brand hover:text-brand focus:border-brand focus:text-brand",
+          "disabled:cursor-wait",
+          over && "border-brand bg-brand-soft text-brand",
+        )}
+      >
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh blob cục bộ
+          <img src={preview} alt="Danh thiếp" className="h-14 w-24 shrink-0 rounded object-cover" />
+        ) : (
+          <span className="grid h-14 w-24 shrink-0 place-items-center rounded bg-subtle">
+            <ScanLine className="size-6" />
+          </span>
+        )}
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 font-medium text-ink-2">
+            {scan.isPending && <Loader2 className="size-4 animate-spin" />}
+            {scan.isPending ? "Đang đọc danh thiếp…" : "Quét danh thiếp để tự điền"}
+          </span>
+          <span className="block text-xs">Chọn / chụp ảnh, kéo thả hoặc dán (Ctrl+V)</span>
+        </span>
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          pick(e.target.files ?? []);
+          e.target.value = "";
+        }}
+      />
+      {scan.data?.text && (
+        <details className="text-xs text-ink-3">
+          <summary className="cursor-pointer select-none">Chữ đọc được từ ảnh</summary>
+          <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-subtle p-2 font-sans whitespace-pre-wrap">
+            {scan.data.text}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function ContactModal({ customer, contact, onClose }: { customer: Customer; contact?: Contact; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const editing = !!contact;
+  const [form, setForm] = useState({
+    full_name: contact?.full_name ?? "",
+    position: contact?.position ?? "",
+    email: contact?.email ?? "",
+    phone: contact?.phone ?? "",
+    is_primary: contact?.is_primary ?? false,
+  });
+  const set = (k: "full_name" | "position" | "email" | "phone", v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const save = useMutation({
+    mutationFn: async () => {
+      const url = `/customers/${customer.id}/contacts`;
+      if (!editing) return api.post(url, clean(form));
+      // Sửa: ô để trống = xoá giá trị cũ
+      const body = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v === "" ? null : v]));
+      return api.patch(`${url}/${contact.id}`, body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customers", customer.id, "contacts"] });
+      toast.success(editing ? "Đã lưu người liên hệ" : "Đã thêm người liên hệ");
+      onClose();
+    },
+    onError: toast.error,
+  });
+
+  const text = (key: "full_name" | "position" | "email" | "phone", label: string, type = "text") => (
+    <Field label={label} required={key === "full_name"}>
+      {(id) => <Input id={id} type={type} value={form[key]} onChange={(e) => set(key, e.target.value)} />}
+    </Field>
+  );
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={editing ? `Sửa ${contact.full_name}` : "Người liên hệ mới"}
+      description={customer.name}
+      footer={
+        <>
+          <Button onClick={onClose}>Huỷ</Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="contact-form"
+            loading={save.isPending}
+            disabled={!form.full_name.trim()}
+          >
+            Lưu
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="contact-form"
+        className="grid gap-4 sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (form.full_name.trim()) save.mutate();
+        }}
+      >
+        {!editing && (
+          <div className="sm:col-span-2">
+            <CardScanner
+              customerId={customer.id}
+              onResult={(r) =>
+                setForm((f) => ({
+                  ...f,
+                  full_name: r.full_name ?? f.full_name,
+                  position: r.position ?? f.position,
+                  email: r.email ?? f.email,
+                  phone: r.phone ?? f.phone,
+                }))
+              }
+            />
+          </div>
+        )}
+        {text("full_name", "Họ tên")}
+        {text("position", "Chức vụ")}
+        {text("email", "Email", "email")}
+        {text("phone", "Điện thoại", "tel")}
+        <Checkbox
+          label="Đầu mối chính"
+          className="sm:col-span-2"
+          checked={form.is_primary}
+          onChange={(e) => setForm((f) => ({ ...f, is_primary: e.target.checked }))}
+        />
+      </form>
+    </Modal>
+  );
+}
+
 function Contacts({ customer }: { customer: Customer }) {
   const qc = useQueryClient();
   const toast = useToast();
   const { can } = useAuth();
   const key = ["customers", customer.id, "contacts"];
-  const [form, setForm] = useState({ full_name: "", position: "", email: "", phone: "", is_primary: false });
+  const [modal, setModal] = useState<{ contact?: Contact } | null>(null);
   const contacts = useQuery({
     queryKey: key,
     queryFn: async () => (await api.get<Contact[]>(`/customers/${customer.id}/contacts`)).data,
-  });
-  const add = useMutation({
-    mutationFn: () => api.post(`/customers/${customer.id}/contacts`, clean(form)),
-    onSuccess: () => {
-      setForm({ full_name: "", position: "", email: "", phone: "", is_primary: false });
-      qc.invalidateQueries({ queryKey: key });
-    },
-    onError: toast.error,
   });
   const update = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Partial<Contact> }) =>
@@ -133,13 +333,16 @@ function Contacts({ customer }: { customer: Customer }) {
   });
   const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/customers/${customer.id}/contacts/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast.success("Đã xoá người liên hệ");
+    },
     onError: toast.error,
   });
   const canEdit = can("customer.update");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {contacts.isPending ? (
         <Spinner />
       ) : !contacts.data?.length ? (
@@ -147,8 +350,8 @@ function Contacts({ customer }: { customer: Customer }) {
       ) : (
         <ul className="divide-y divide-line rounded-lg border border-line">
           {contacts.data.map((c) => (
-            <li key={c.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
-              <div className="min-w-0 flex-1">
+            <li key={c.id} className="flex items-center gap-1 px-3 py-2.5 text-sm">
+              <div className="min-w-0 flex-1 pr-2">
                 <p className="font-medium">
                   {c.full_name}
                   {c.position && <span className="font-normal text-ink-3"> · {c.position}</span>}
@@ -160,9 +363,9 @@ function Contacts({ customer }: { customer: Customer }) {
                     </a>
                   )}
                   {c.phone && (
-                    <span className="inline-flex items-center gap-1">
+                    <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 hover:text-brand">
                       <Phone className="size-3" /> {c.phone}
-                    </span>
+                    </a>
                   )}
                 </p>
               </div>
@@ -174,6 +377,9 @@ function Contacts({ customer }: { customer: Customer }) {
                     onClick={() => !c.is_primary && update.mutate({ id: c.id, body: { is_primary: true } })}
                   >
                     <Star className={cn("size-4", c.is_primary && "fill-current")} />
+                  </IconButton>
+                  <IconButton label="Sửa người liên hệ" onClick={() => setModal({ contact: c })}>
+                    <Pencil className="size-4" />
                   </IconButton>
                   <IconButton
                     label="Xoá người liên hệ"
@@ -191,48 +397,11 @@ function Contacts({ customer }: { customer: Customer }) {
         </ul>
       )}
       {canEdit && (
-        <form
-          className="grid gap-2 rounded-lg bg-subtle p-3 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (form.full_name.trim()) add.mutate();
-          }}
-        >
-          <Input
-            aria-label="Họ tên"
-            placeholder="Họ tên *"
-            value={form.full_name}
-            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-          />
-          <Input
-            aria-label="Chức vụ"
-            placeholder="Chức vụ"
-            value={form.position}
-            onChange={(e) => setForm({ ...form, position: e.target.value })}
-          />
-          <Input
-            aria-label="Email"
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <Input
-            aria-label="Điện thoại"
-            placeholder="Điện thoại"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <Checkbox
-            label="Đầu mối chính"
-            checked={form.is_primary}
-            onChange={(e) => setForm({ ...form, is_primary: e.target.checked })}
-          />
-          <Button type="submit" size="sm" className="justify-self-end" loading={add.isPending} disabled={!form.full_name.trim()}>
-            Thêm người liên hệ
-          </Button>
-        </form>
+        <Button size="sm" icon={<UserPlus className="size-3.5" />} onClick={() => setModal({})}>
+          Thêm người liên hệ
+        </Button>
       )}
+      {modal && <ContactModal customer={customer} contact={modal.contact} onClose={() => setModal(null)} />}
     </div>
   );
 }

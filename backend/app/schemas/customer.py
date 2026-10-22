@@ -70,3 +70,14 @@ class ContactOut(ORMModel):
     email: str | None
     phone: str | None
     is_primary: bool
+
+
+class ContactOcrOut(BaseModel):
+    """Gợi ý điền form người liên hệ từ ảnh danh thiếp."""
+
+    full_name: str | None
+    position: str | None
+    email: str | None
+    phone: str | None
+    company: str | None
+    text: str

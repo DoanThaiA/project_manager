@@ -19,23 +19,6 @@ logger = logging.getLogger(__name__)
 
 ENTITY = "work_item"
 
-# Chữ ký đầu file -> (mime, đuôi). Không nhận SVG (có thể chứa script).
-_IMAGE_SIGNATURES = [
-    (b"\x89PNG\r\n\x1a\n", "image/png", "png"),
-    (b"\xff\xd8\xff", "image/jpeg", "jpg"),
-    (b"GIF87a", "image/gif", "gif"),
-    (b"GIF89a", "image/gif", "gif"),
-]
-
-
-def _detect_image(data: bytes) -> tuple[str, str] | None:
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp", "webp"
-    for magic, mime, ext in _IMAGE_SIGNATURES:
-        if data.startswith(magic):
-            return mime, ext
-    return None
-
 
 def _out(att: Attachment) -> AttachmentOut:
     fields = {name: getattr(att, name) for name in AttachmentOut.model_fields if name != "url"}
@@ -75,7 +58,7 @@ async def upload_attachment(
     data = await file.read(max_bytes + 1)
     if len(data) > max_bytes:
         raise HTTPException(status_code=413, detail=f"Ảnh vượt quá {settings.attachment_max_mb} MB")
-    detected = _detect_image(data)
+    detected = storage.detect_image(data)
     if detected is None:
         raise HTTPException(status_code=422, detail="Chỉ nhận ảnh PNG, JPEG, GIF hoặc WebP")
     mime, ext = detected

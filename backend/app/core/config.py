@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     cf_images_url_expire_seconds: int = 60 * 60
     attachment_max_mb: int = 10
 
+    # OCR.space đọc chữ trên ảnh danh thiếp khi thêm người liên hệ (https://ocr.space/ocrapi)
+    ocr_space_api_key: str = ""
+    ocr_space_url: str = "https://api.ocr.space/parse/image"
+    ocr_space_engine: int = 2  # engine 2 tự nhận ngôn ngữ, đọc tốt tiếng Việt có dấu
+    ocr_max_kb: int = 1024  # gói miễn phí giới hạn 1 MB / ảnh
+
 
 @lru_cache
 def get_settings() -> Settings:

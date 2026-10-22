@@ -135,6 +135,15 @@ phần còn lại vẫn chạy bình thường. Cloudflare Images cần gói tr�
 Giới hạn: ảnh PNG / JPEG / GIF / WebP, tối đa 10 MB mỗi ảnh (`ATTACHMENT_MAX_MB`). Ảnh hiển thị qua
 variant `public` (có sẵn mặc định, đổi bằng `CF_IMAGES_VARIANT`).
 
+## 9. OCR danh thiếp (OCR.space)
+
+Khi thêm người liên hệ cho khách hàng, có thể chụp / chọn ảnh danh thiếp: API gửi ảnh sang
+[OCR.space](https://ocr.space/ocrapi) rồi tự điền họ tên, chức vụ, email, điện thoại (người dùng kiểm tra
+lại trước khi lưu). Ảnh không được lưu lại. Lấy API key tại ocr.space, đặt `OCR_SPACE_API_KEY` trong `.env`
+rồi `docker compose up -d api`; để trống thì nút quét trả lỗi 503, nhập tay vẫn bình thường.
+
+Gói miễn phí giới hạn ảnh 1 MB (`OCR_MAX_KB`); trình duyệt tự thu nhỏ ảnh trước khi gửi.
+
 ## Cập nhật phiên bản
 
 ```bash

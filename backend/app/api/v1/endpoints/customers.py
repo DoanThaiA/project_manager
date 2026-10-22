@@ -1,20 +1,23 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_permission
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import Customer, CustomerContact, User
 from app.models.enums import CustomerStatus
 from app.schemas.common import Page
 from app.schemas.customer import (
     ContactCreate,
+    ContactOcrOut,
     ContactOut,
     ContactUpdate,
     CustomerCreate,
     CustomerOut,
     CustomerUpdate,
 )
+from app.services import ocr, storage
 from app.services.common import apply_update, not_found, paginate
 
 router = APIRouter()
@@ -133,6 +136,30 @@ async def create_contact(
     db.add(contact)
     await db.commit()
     return contact
+
+
+@router.post(
+    "/{customer_id}/contacts/ocr",
+    response_model=ContactOcrOut,
+    summary="Đọc ảnh danh thiếp (OCR.space) để gợi ý thông tin người liên hệ",
+)
+async def ocr_contact_card(
+    customer_id: int,
+    file: UploadFile = File(...),
+    _: User = Depends(require_permission("customer.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_customer(db, customer_id)
+    max_bytes = settings.ocr_max_kb * 1024
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Ảnh vượt quá {settings.ocr_max_kb} KB")
+    detected = storage.detect_image(data)
+    if detected is None:
+        raise HTTPException(status_code=422, detail="Chỉ nhận ảnh PNG, JPEG, GIF hoặc WebP")
+    mime, ext = detected
+    text = await ocr.read_text(data, f"card.{ext}", mime)
+    return ContactOcrOut(**ocr.parse_card(text), text=text)
 
 
 @router.patch("/{customer_id}/contacts/{contact_id}", response_model=ContactOut)

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { CompleteSprintModal } from "@/components/project/sprint-modals";
+import { LinkedWorkItem } from "@/components/project/linked-work-item";
 import { WorkItemModal } from "@/components/project/work-item-modal";
 import { MetaBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -262,6 +263,7 @@ export default function BoardPage() {
       )}
 
       {openItem && <WorkItemModal pid={pid} item={openItem} onClose={() => setOpenItem(null)} />}
+      <LinkedWorkItem pid={pid} />
       {creating && <WorkItemModal pid={pid} defaults={{ sprint_id: sprint.id }} onClose={() => setCreating(false)} />}
       {completing && (
         <CompleteSprintModal pid={pid} sprint={sprint} unfinished={unfinished} onClose={() => setCompleting(false)} />

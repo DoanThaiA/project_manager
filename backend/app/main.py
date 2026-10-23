@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -5,11 +8,21 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.services.notifications.worker import worker
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    worker.start()  # thông báo Telegram chạy nền (tắt nếu chưa đặt TELEGRAM_BOT_TOKEN)
+    yield
+    await worker.stop()
+
 
 app = FastAPI(
     title=settings.app_name,
     description="API quản lý dự án phần mềm theo Scrum/Agile: yêu cầu khách hàng, backlog, sprint, log công việc.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

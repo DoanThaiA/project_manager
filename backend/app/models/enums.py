@@ -109,3 +109,14 @@ class AttachmentCategory(StrEnum):
 
     bug = "bug"  # ảnh chụp lỗi
     result = "result"  # ảnh kết quả sau khi sửa
+
+
+class NotificationEvent(StrEnum):
+    """Loại sự kiện gửi thông báo Telegram."""
+
+    work_item_status_changed = "work_item.status_changed"
+
+
+class NotificationScope(StrEnum):
+    all = "all"  # group: mọi công việc của dự án; cá nhân: mọi công việc trong các dự án mình tham gia
+    mine = "mine"  # cá nhân: chỉ việc giao cho mình / mình tạo

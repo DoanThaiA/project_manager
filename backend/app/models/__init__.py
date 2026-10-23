@@ -1,5 +1,11 @@
 from app.models.attachment import Attachment
 from app.models.customer import Customer, CustomerContact
+from app.models.notification import (
+    NotificationDelivery,
+    NotificationSubscription,
+    TelegramChat,
+    TelegramLinkCode,
+)
 from app.models.project import Project, ProjectMember, Sprint
 from app.models.requirement import Requirement, RequirementComment, RequirementStatusHistory
 from app.models.user import Permission, Role, User, UserRole, role_permissions
@@ -10,6 +16,8 @@ __all__ = [
     "Attachment",
     "Customer",
     "CustomerContact",
+    "NotificationDelivery",
+    "NotificationSubscription",
     "Permission",
     "Project",
     "ProjectMember",
@@ -18,6 +26,8 @@ __all__ = [
     "RequirementStatusHistory",
     "Role",
     "Sprint",
+    "TelegramChat",
+    "TelegramLinkCode",
     "User",
     "UserRole",
     "WorkItem",

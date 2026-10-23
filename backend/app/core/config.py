@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     ocr_space_engine: int = 2  # engine 2 tự nhận ngôn ngữ, đọc tốt tiếng Việt có dấu
     ocr_max_kb: int = 1024  # gói miễn phí giới hạn 1 MB / ảnh
 
+    # Thông báo Telegram (tạo bot với @BotFather). Bỏ trống token = tắt tính năng.
+    telegram_bot_token: str = ""
+    telegram_api_url: str = "https://api.telegram.org"
+    telegram_poll_seconds: float = 5  # chu kỳ worker xử lý hàng đợi thông báo
+    app_public_url: str = "http://localhost:3000"  # để chèn link mở công việc vào tin nhắn
+
 
 @lru_cache
 def get_settings() -> Settings:

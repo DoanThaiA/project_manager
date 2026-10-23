@@ -144,6 +144,30 @@ rồi `docker compose up -d api`; để trống thì nút quét trả lỗi 503,
 
 Gói miễn phí giới hạn ảnh 1 MB (`OCR_MAX_KB`); trình duyệt tự thu nhỏ ảnh trước khi gửi.
 
+## 10. Thông báo Telegram
+
+Khi công việc được đổi trạng thái (kéo thả trên Sprint board, sửa công việc, bắt đầu / kết thúc sprint), bot gửi
+tin tới **group của dự án** và **chat riêng** của người liên quan. Bot nhận lệnh bằng long polling — không cần
+webhook, không cần mở port; container API chỉ cần gọi ra được `https://api.telegram.org`.
+
+1. Trên Telegram, chat với [@BotFather](https://t.me/BotFather):
+   - `/newbot` → đặt tên và username (vd `mcv_pm_bot`) → nhận **token**.
+   - `/setjoingroups` → chọn bot → **Enable** (cho phép thêm bot vào group).
+   - `/setprivacy` → giữ **Enable** (bot chỉ cần đọc lệnh `/start`, không đọc tin khác trong group).
+2. Trong `.env`: `TELEGRAM_BOT_TOKEN=<token>`, `APP_PUBLIC_URL=https://dev.mcv.network`, rồi
+   `docker compose up -d --build api` (API tự chạy migration 0005).
+3. Liên kết chat (token không bao giờ lộ ra trình duyệt; mã liên kết dùng một lần, hết hạn sau 15 phút):
+   - **Cá nhân**: menu tài khoản › *Thông báo Telegram* › *Kết nối Telegram* → Telegram mở chat với bot → bấm
+     **Start**. Mặc định nhận thông báo khi việc *giao cho mình* hoặc *do mình tạo* đổi trạng thái (không báo
+     thay đổi do chính mình làm).
+   - **Group**: dự án › *Thông báo* › *Thêm group Telegram* → chọn group → bot vào group và tự liên kết. Cần
+     quyền `project.notification.manage` (mặc định: Product Owner, Scrum Master). Có thể lọc chỉ báo khi chuyển
+     sang một số trạng thái (vd chỉ *Review*, *Xong*).
+
+Nhiều công việc đổi trạng thái trong cùng một thao tác (vd kết thúc sprint) được gộp thành một tin. Telegram lỗi
+thì tin được gửi lại (30 giây → 1 giờ, tối đa 5 lần); bot bị xoá khỏi group / bị chặn thì chat đó ngừng nhận
+cho tới khi liên kết lại hoặc bấm *Gửi thử* thành công. Xem lỗi: `docker compose logs -f api | grep -i telegram`.
+
 ## Cập nhật phiên bản
 
 ```bash

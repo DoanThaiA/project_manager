@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { SprintSelect } from "@/components/project/selects";
 import { CreateSprintModal } from "@/components/project/sprint-modals";
+import { LinkedWorkItem } from "@/components/project/linked-work-item";
 import { WorkItemModal } from "@/components/project/work-item-modal";
 import { Badge, MetaBadge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
@@ -277,6 +278,7 @@ export default function BacklogPage() {
 
       {creating && <WorkItemModal pid={pid} defaults={creating} onClose={() => setCreating(null)} />}
       {openItem && <WorkItemModal pid={pid} item={openItem} onClose={() => setOpenItem(null)} />}
+      <LinkedWorkItem pid={pid} />
       {sprintModal && <CreateSprintModal pid={pid} onClose={() => setSprintModal(false)} />}
     </>
   );

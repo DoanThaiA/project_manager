@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bell,
   Building2,
   ClipboardList,
   FolderKanban,
@@ -29,6 +30,7 @@ const MAIN_NAV: NavItem[] = [
   { href: "/", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/projects", label: "Dự án", icon: FolderKanban },
   { href: "/timesheet", label: "Timesheet của tôi", icon: Timer },
+  { href: "/settings/notifications", label: "Thông báo Telegram", icon: Bell },
   { href: "/customers", label: "Khách hàng", icon: Building2, perm: "customer.view" },
 ];
 

@@ -89,6 +89,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kết nối Telegram của tôi */
+        get: operations["get_my_telegram_api_v1_me_telegram_get"];
+        put?: never;
+        post?: never;
+        /** Ngắt kết nối Telegram của tôi */
+        delete: operations["unlink_my_telegram_api_v1_me_telegram_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/telegram/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo link kết nối Telegram cá nhân */
+        post: operations["link_my_telegram_api_v1_me_telegram_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/telegram/subscriptions/{event}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Tuỳ chọn nhận thông báo của tôi */
+        put: operations["update_my_subscription_api_v1_me_telegram_subscriptions__event__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/telegram/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi tin thử tới Telegram của tôi */
+        post: operations["test_my_telegram_api_v1_me_telegram_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -798,6 +867,91 @@ export interface paths {
         patch: operations["update_work_log_api_v1_projects__project_id__work_logs__log_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các group Telegram nhận thông báo của dự án */
+        get: operations["list_project_chats_api_v1_projects__project_id__telegram_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/telegram/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo link thêm bot vào group Telegram */
+        post: operations["link_project_chat_api_v1_projects__project_id__telegram_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/telegram/chats/{chat_id}/subscriptions/{event}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Bộ lọc thông báo */
+        put: operations["update_project_subscription_api_v1_projects__project_id__telegram_chats__chat_id__subscriptions__event__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/telegram/chats/{chat_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi tin thử tới group */
+        post: operations["test_project_chat_api_v1_projects__project_id__telegram_chats__chat_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/telegram/chats/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Gỡ group khỏi dự án */
+        delete: operations["delete_project_chat_api_v1_projects__project_id__telegram_chats__chat_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/reports/summary": {
         parameters: {
             query?: never;
@@ -1241,6 +1395,23 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** MyTelegramOut */
+        MyTelegramOut: {
+            /** Configured */
+            configured: boolean;
+            chat: components["schemas"]["TelegramChatOut"] | null;
+        };
+        /**
+         * NotificationEvent
+         * @description Loại sự kiện gửi thông báo Telegram.
+         * @enum {string}
+         */
+        NotificationEvent: "work_item.status_changed";
+        /**
+         * NotificationScope
+         * @enum {string}
+         */
+        NotificationScope: "all" | "mine";
         /** Page[ActivityLogOut] */
         Page_ActivityLogOut_: {
             /** Items */
@@ -1445,6 +1616,13 @@ export interface components {
             active_sprint: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** ProjectTelegramOut */
+        ProjectTelegramOut: {
+            /** Configured */
+            configured: boolean;
+            /** Chats */
+            chats: components["schemas"]["TelegramChatOut"][];
         };
         /** ProjectUpdate */
         ProjectUpdate: {
@@ -1912,6 +2090,61 @@ export interface components {
              * Format: date-time
              */
             changed_at: string;
+        };
+        /** SubscriptionOut */
+        SubscriptionOut: {
+            event: components["schemas"]["NotificationEvent"];
+            scope: components["schemas"]["NotificationScope"];
+            /** Statuses */
+            statuses: components["schemas"]["WorkItemStatus"][];
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** SubscriptionUpdate */
+        SubscriptionUpdate: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** @default all */
+            scope: components["schemas"]["NotificationScope"];
+            /**
+             * Statuses
+             * @default []
+             */
+            statuses: components["schemas"]["WorkItemStatus"][];
+        };
+        /** TelegramChatOut */
+        TelegramChatOut: {
+            /** Id */
+            id: number;
+            /** Type */
+            type: string;
+            /** Title */
+            title: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Linked At
+             * Format: date-time
+             */
+            linked_at: string;
+            /**
+             * Subscriptions
+             * @default []
+             */
+            subscriptions: components["schemas"]["SubscriptionOut"][];
+        };
+        /** TelegramLinkOut */
+        TelegramLinkOut: {
+            /** Url */
+            url: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /** Token */
         Token: {
@@ -2447,6 +2680,117 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_my_telegram_api_v1_me_telegram_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTelegramOut"];
+                };
+            };
+        };
+    };
+    unlink_my_telegram_api_v1_me_telegram_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    link_my_telegram_api_v1_me_telegram_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLinkOut"];
+                };
+            };
+        };
+    };
+    update_my_subscription_api_v1_me_telegram_subscriptions__event__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: components["schemas"]["NotificationEvent"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_my_telegram_api_v1_me_telegram_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4742,6 +5086,165 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkLogOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_chats_api_v1_projects__project_id__telegram_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectTelegramOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_project_chat_api_v1_projects__project_id__telegram_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_subscription_api_v1_projects__project_id__telegram_chats__chat_id__subscriptions__event__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+                event: components["schemas"]["NotificationEvent"];
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_project_chat_api_v1_projects__project_id__telegram_chats__chat_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_chat_api_v1_projects__project_id__telegram_chats__chat_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

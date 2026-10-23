@@ -15,6 +15,9 @@ services:
       CF_IMAGES_SIGNING_KEY: ${CF_IMAGES_SIGNING_KEY:-}
       # OCR.space đọc ảnh danh thiếp khi thêm người liên hệ
       OCR_SPACE_API_KEY: ${OCR_SPACE_API_KEY:-}
+      # Thông báo Telegram: bot nhận lệnh bằng long polling nên chỉ cần gọi ra được api.telegram.org
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
     ports:
       - "${PM_BIND_ADDR:-0.0.0.0}:${PM_API_PORT:-8000}:8000"
     networks:

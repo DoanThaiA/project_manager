@@ -19,6 +19,7 @@ const TABS = [
   { slug: "work-logs", label: "Log công việc", perm: "work_log.view" },
   { slug: "members", label: "Thành viên" },
   { slug: "activity", label: "Nhật ký", perm: "activity_log.view" },
+  { slug: "notifications", label: "Thông báo", perm: "project.notification.manage" },
 ];
 
 /** Header + tab của trang dự án (client: đọc pid từ URL, quyền theo dự án). */

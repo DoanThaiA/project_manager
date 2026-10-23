@@ -48,3 +48,10 @@ export type WorkItemType = WorkItem["type"];
 export type ActivityType = WorkLog["activity_type"];
 export type SprintStatus = Sprint["status"];
 export type ProjectStatus = Project["status"];
+
+export type TelegramChat = S["TelegramChatOut"];
+export type TelegramLink = S["TelegramLinkOut"];
+export type MyTelegram = S["MyTelegramOut"];
+export type ProjectTelegram = S["ProjectTelegramOut"];
+export type NotificationSubscription = S["SubscriptionOut"];
+export type NotificationEvent = NotificationSubscription["event"];

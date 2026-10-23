@@ -8,11 +8,13 @@ import { ImageTextEditor } from "@/components/project/image-text-editor";
 import {
   CATEGORY_LABEL,
   imageMarker,
+  textImageSource,
   useWorkItemImages,
   WorkItemImages,
 } from "@/components/project/work-item-images";
 import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
 import { WorkLogModal } from "@/components/project/work-log-form";
+import { TextImagesButton, withoutImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
@@ -234,8 +236,7 @@ export function WorkItemModal({
                 rows={4}
                 value={form.description}
                 onChange={(v) => set("description", v)}
-                category="bug"
-                images={images}
+                source={textImageSource(images, "bug")}
                 editable={canEdit}
               />
             )}
@@ -247,8 +248,7 @@ export function WorkItemModal({
                 rows={2}
                 value={form.acceptance_criteria}
                 onChange={(v) => set("acceptance_criteria", v)}
-                category="result"
-                images={images}
+                source={textImageSource(images, "result")}
                 editable={canEdit}
               />
             )}
@@ -357,7 +357,10 @@ export function WorkItemModal({
                   <li key={l.id} className="flex items-start gap-3 px-3 py-2 text-sm">
                     <span className="w-12 shrink-0 font-medium tabular-nums">{fmtHours(l.hours)}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate">{l.description}</p>
+                      <p className="flex items-center gap-1">
+                        <span className="truncate">{withoutImages(l.description)}</span>
+                        <TextImagesButton pid={pid} text={l.description} />
+                      </p>
                       <p className="text-xs text-ink-3">
                         {byId.get(l.user_id)?.full_name ?? `#${l.user_id}`} · {fmtDate(l.log_date)} ·{" "}
                         {ACTIVITY_TYPE[l.activity_type]}

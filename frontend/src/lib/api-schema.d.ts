@@ -744,6 +744,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/inline-images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lấy URL các ảnh dán trong văn bản theo tên file */
+        get: operations["resolve_inline_images_api_v1_projects__project_id__inline_images_get"];
+        put?: never;
+        /** Tải ảnh dán trong văn bản lên Cloudflare Images */
+        post: operations["upload_inline_image_api_v1_projects__project_id__inline_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/work-logs": {
         parameters: {
             query?: never;
@@ -954,6 +972,11 @@ export interface components {
             /** File */
             file: string;
             category: components["schemas"]["AttachmentCategory"];
+        };
+        /** Body_upload_inline_image_api_v1_projects__project_id__inline_images_post */
+        Body_upload_inline_image_api_v1_projects__project_id__inline_images_post: {
+            /** File */
+            file: string;
         };
         /** CommentCreate */
         CommentCreate: {
@@ -4509,6 +4532,74 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_inline_images_api_v1_projects__project_id__inline_images_get: {
+        parameters: {
+            query: {
+                names: string[];
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_inline_image_api_v1_projects__project_id__inline_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_inline_image_api_v1_projects__project_id__inline_images_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
             };
             /** @description Validation Error */
             422: {

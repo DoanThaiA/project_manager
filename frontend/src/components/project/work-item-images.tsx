@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Modal } from "@/components/ui/modal";
+import { IMAGE_ACCEPT, ImageViewerModal, pickImages, type TextImageSource } from "@/components/text-images";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import type { Attachment, AttachmentCategory } from "@/lib/types";
@@ -25,8 +25,6 @@ export function parseImageMarker(line: string): { category: AttachmentCategory; 
   const category = (Object.keys(CATEGORY_LABEL) as AttachmentCategory[]).find((c) => CATEGORY_LABEL[c] === m[1])!;
   return { category, name: m[2] };
 }
-const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
-const MAX_MB = 10;
 
 /** Ảnh chọn khi đang tạo công việc mới — tải lên Cloudflare sau khi công việc được tạo. */
 type PendingImage = { id: string; file: File; category: AttachmentCategory; preview: string };
@@ -36,19 +34,6 @@ async function uploadImage(pid: number, itemId: number, file: File, category: At
   body.append("file", file);
   body.append("category", category);
   return (await api.post<Attachment>(`/projects/${pid}/work-items/${itemId}/attachments`, body)).data;
-}
-
-/** Lọc file ảnh hợp lệ; ảnh dán từ clipboard thường tên "image.png" nên đặt lại tên theo thời gian. */
-function pickImages(files: Iterable<File>, onReject: (msg: string) => void): File[] {
-  const ok: File[] = [];
-  const stamp = Date.now();
-  for (const f of files) {
-    if (!ACCEPT.split(",").includes(f.type)) onReject(`${f.name}: chỉ nhận ảnh PNG, JPEG, GIF, WebP`);
-    else if (f.size > MAX_MB * 1024 * 1024) onReject(`${f.name}: vượt quá ${MAX_MB} MB`);
-    else if (f.name === "image.png") ok.push(new File([f], `screenshot-${stamp + ok.length}.png`, { type: f.type }));
-    else ok.push(f);
-  }
-  return ok;
 }
 
 type Thumb = { key: string | number; src: string; name: string; uploading?: boolean; onRemove?: () => void };
@@ -168,6 +153,18 @@ export function useWorkItemImages({
   return { canEdit, add, uploadPending, thumbs, find };
 }
 
+/** Nguồn ảnh cho ô văn bản: dán ảnh vào ô nào thì thêm vào nhóm `category` của công việc. */
+export function textImageSource(images: WorkItemImagesState, category: AttachmentCategory): TextImageSource {
+  return {
+    isMarker: (line) => parseImageMarker(line) !== null,
+    add: (files) => images.add(files, category).map((name) => imageMarker(category, name)),
+    find: (marker) => {
+      const ref = parseImageMarker(marker);
+      return ref ? images.find(ref.category, ref.name) : undefined;
+    },
+  };
+}
+
 /** Khu "Hình ảnh": hai cột Ảnh lỗi / Ảnh sau khi sửa. */
 export function WorkItemImages({ images }: { images: WorkItemImagesState }) {
   const [viewing, setViewing] = useState<Thumb | null>(null);
@@ -198,17 +195,7 @@ export function WorkItemImages({ images }: { images: WorkItemImagesState }) {
         })}
       </div>
 
-      {viewing && (
-        <Modal open size="xl" title={viewing.name} onClose={() => setViewing(null)}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- ảnh từ Cloudflare Images, không qua next/image */}
-          <img src={viewing.src} alt={viewing.name} className="mx-auto max-h-[70vh] rounded-lg object-contain" />
-          <p className="mt-3 text-center text-sm">
-            <a href={viewing.src} target="_blank" rel="noreferrer" className="text-brand hover:underline">
-              Mở ảnh gốc trong tab mới
-            </a>
-          </p>
-        </Modal>
-      )}
+      {viewing && <ImageViewerModal image={viewing} onClose={() => setViewing(null)} />}
     </section>
   );
 }
@@ -278,7 +265,7 @@ function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
       <input
         ref={input}
         type="file"
-        accept={ACCEPT}
+        accept={IMAGE_ACCEPT}
         multiple
         hidden
         onChange={(e) => {

@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { MetaBadge } from "@/components/ui/badge";
+import { TextImagesButton, withoutImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, Empty, PageHeader, Spinner, Stat } from "@/components/ui/misc";
 import { api } from "@/lib/api";
@@ -117,7 +118,10 @@ export default function DashboardPage() {
                 <li key={l.id} className="flex items-start gap-3 px-4 py-2.5">
                   <span className="w-11 shrink-0 font-semibold tabular-nums">{fmtHours(l.hours)}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate">{l.description}</p>
+                    <p className="flex items-center gap-1">
+                      <span className="truncate">{withoutImages(l.description)}</span>
+                      <TextImagesButton pid={l.project_id} text={l.description} />
+                    </p>
                     <p className="text-xs text-ink-3">
                       {projectKey.get(l.project_id) ?? `#${l.project_id}`} · {fmtDate(l.log_date)} ·{" "}
                       {ACTIVITY_TYPE[l.activity_type]}

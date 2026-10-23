@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { addDays, format, parseISO } from "date-fns";
 import { useState } from "react";
 
+import { ImageTextEditor } from "@/components/project/image-text-editor";
+import { PASTE_HINT, useInlineImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
@@ -98,6 +100,7 @@ export function CompleteSprintModal({
   const [target, setTarget] = useState<string>("backlog");
   const [review, setReview] = useState(sprint.review_note ?? "");
   const [retro, setRetro] = useState(sprint.retrospective_note ?? "");
+  const images = useInlineImages(pid, [review, retro]);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -123,7 +126,12 @@ export function CompleteSprintModal({
       footer={
         <>
           <Button onClick={onClose}>Huỷ</Button>
-          <Button variant="primary" loading={mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button
+            variant="primary"
+            loading={mutation.isPending}
+            disabled={images.uploading > 0}
+            onClick={() => mutation.mutate()}
+          >
             Kết thúc sprint
           </Button>
         </>
@@ -148,11 +156,11 @@ export function CompleteSprintModal({
             Tất cả công việc trong sprint đã hoàn thành.
           </p>
         )}
-        <Field label="Sprint Review" hint="Kết quả demo, phản hồi của khách hàng">
-          {(id) => <Textarea id={id} rows={3} value={review} onChange={(e) => setReview(e.target.value)} />}
+        <Field label="Sprint Review" hint={`Kết quả demo, phản hồi của khách hàng. ${PASTE_HINT}`}>
+          {(id) => <ImageTextEditor id={id} rows={3} value={review} onChange={setReview} source={images.source} />}
         </Field>
-        <Field label="Sprint Retrospective" hint="Điều làm tốt, cần cải thiện, hành động">
-          {(id) => <Textarea id={id} rows={3} value={retro} onChange={(e) => setRetro(e.target.value)} />}
+        <Field label="Sprint Retrospective" hint={`Điều làm tốt, cần cải thiện, hành động. ${PASTE_HINT}`}>
+          {(id) => <ImageTextEditor id={id} rows={3} value={retro} onChange={setRetro} source={images.source} />}
         </Field>
       </div>
     </Modal>

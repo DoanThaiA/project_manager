@@ -3,9 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { ImageTextEditor } from "@/components/project/image-text-editor";
 import { EnumSelect } from "@/components/project/selects";
+import { PASTE_HINT, useInlineImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
-import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Checkbox, Field, Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -42,6 +44,7 @@ export function WorkLogModal({
   const [description, setDescription] = useState(log?.description ?? "");
   const [billable, setBillable] = useState(log?.is_billable ?? true);
   const [remaining, setRemaining] = useState("");
+  const images = useInlineImages(projectId, [description]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -74,7 +77,13 @@ export function WorkLogModal({
     onError: toast.error,
   });
 
-  const valid = !!projectId && Number(hours) > 0 && Number(hours) <= 24 && description.trim() && logDate;
+  const valid =
+    !!projectId &&
+    Number(hours) > 0 &&
+    Number(hours) <= 24 &&
+    description.trim() &&
+    logDate &&
+    images.uploading === 0;
 
   return (
     <Modal
@@ -147,8 +156,10 @@ export function WorkLogModal({
             )}
           </Field>
         )}
-        <Field label="Nội dung đã làm" required className="sm:col-span-2">
-          {(id) => <Textarea id={id} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />}
+        <Field label="Nội dung đã làm" required hint={PASTE_HINT} className="sm:col-span-2">
+          {(id) => (
+            <ImageTextEditor id={id} rows={3} value={description} onChange={setDescription} source={images.source} />
+          )}
         </Field>
         <Checkbox
           className="sm:col-span-2"

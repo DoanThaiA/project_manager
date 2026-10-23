@@ -8,8 +8,10 @@ import { useState } from "react";
 
 import { ActivityFeed } from "@/components/activity-feed";
 import { useProjectActivityResolver } from "@/lib/activity-resolver";
+import { ImageTextEditor } from "@/components/project/image-text-editor";
 import { RequirementFormModal } from "@/components/project/requirement-form";
 import { WorkItemModal } from "@/components/project/work-item-modal";
+import { PASTE_HINT, RichText, useInlineImages } from "@/components/text-images";
 import { Badge, MetaBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Textarea } from "@/components/ui/form";
@@ -55,6 +57,7 @@ function StatusChangeModal({
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const rejecting = target === "rejected";
+  const images = useInlineImages(pid, [note]);
   const mutation = useMutation({
     mutationFn: () =>
       api.post(`/projects/${pid}/requirements/${req.id}/status`, {
@@ -86,7 +89,7 @@ function StatusChangeModal({
           <Button
             variant={rejecting ? "danger" : "primary"}
             loading={mutation.isPending}
-            disabled={rejecting && !reason.trim()}
+            disabled={(rejecting && !reason.trim()) || images.uploading > 0}
             onClick={() => mutation.mutate()}
           >
             Xác nhận
@@ -100,15 +103,16 @@ function StatusChangeModal({
             {(id) => <Textarea id={id} autoFocus value={reason} onChange={(e) => setReason(e.target.value)} />}
           </Field>
         )}
-        <Field label="Ghi chú" hint="Lưu vào lịch sử trạng thái">
+        <Field label="Ghi chú" hint={`Lưu vào lịch sử trạng thái. ${PASTE_HINT}`}>
           {(id) => (
-            <Textarea
+            <ImageTextEditor
               id={id}
-              autoFocus={!rejecting}
               rows={2}
+              autoFocus={!rejecting}
               placeholder="vd: Khách hàng xác nhận qua email ngày…"
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={setNote}
+              source={images.source}
             />
           )}
         </Field>
@@ -123,6 +127,8 @@ function Comments({ pid, rid }: { pid: number; rid: number }) {
   const { can } = useProjectPerms(pid);
   const [content, setContent] = useState("");
   const [internal, setInternal] = useState(false);
+  const images = useInlineImages(pid, [content]);
+  const canSend = !!content.trim() && images.uploading === 0;
   const key = ["project", pid, "requirements", rid, "comments"];
   const comments = useQuery({
     queryKey: key,
@@ -158,7 +164,7 @@ function Comments({ pid, rid }: { pid: number; rid: number }) {
                   </Badge>
                 )}
               </div>
-              <p className="pl-8 text-sm whitespace-pre-line">{c.content}</p>
+              <RichText pid={pid} text={c.content} className="pl-8 text-sm" />
             </li>
           ))}
         </ul>
@@ -168,18 +174,17 @@ function Comments({ pid, rid }: { pid: number; rid: number }) {
           className="space-y-2 border-t border-line p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (content.trim()) add.mutate();
+            if (canSend) add.mutate();
           }}
         >
-          <Textarea
+          <ImageTextEditor
             aria-label="Nội dung bình luận"
             rows={2}
-            placeholder="Viết bình luận…"
+            placeholder="Viết bình luận… (dán ảnh bằng Ctrl+V, gửi bằng Ctrl+Enter)"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && content.trim()) add.mutate();
-            }}
+            onChange={setContent}
+            source={images.source}
+            onSubmit={() => canSend && add.mutate()}
           />
           <div className="flex items-center justify-between gap-2">
             {can("requirement.view_internal") ? (
@@ -191,7 +196,7 @@ function Comments({ pid, rid }: { pid: number; rid: number }) {
             ) : (
               <span />
             )}
-            <Button type="submit" size="sm" variant="primary" loading={add.isPending} disabled={!content.trim()}>
+            <Button type="submit" size="sm" variant="primary" loading={add.isPending} disabled={!canSend}>
               Gửi
             </Button>
           </div>
@@ -259,7 +264,7 @@ function HistoryTabs({ pid, rid }: { pid: number; rid: number }) {
                 <p className="mt-1 text-xs text-ink-3">
                   {h.changed_by_name ?? "Hệ thống"} · {fmtDateTime(h.changed_at)}
                 </p>
-                {h.note && <p className="mt-1 text-sm text-ink-2">{h.note}</p>}
+                {h.note && <RichText pid={pid} text={h.note} className="mt-1 text-sm text-ink-2" />}
               </li>
             ))}
           </ol>
@@ -338,14 +343,14 @@ export default function RequirementDetailPage() {
             </div>
             <h2 className="text-lg font-semibold">{r.title}</h2>
             {r.description ? (
-              <p className="mt-3 text-sm leading-relaxed whitespace-pre-line text-ink-2">{r.description}</p>
+              <RichText pid={pid} text={r.description} className="mt-3 text-sm leading-relaxed text-ink-2" />
             ) : (
               <p className="mt-3 text-sm text-ink-3 italic">Chưa có mô tả.</p>
             )}
             {r.acceptance_criteria && (
               <div className="mt-4 rounded-lg bg-subtle px-4 py-3">
                 <p className="mb-1 text-xs font-semibold tracking-wide text-ink-3 uppercase">Tiêu chí nghiệm thu</p>
-                <p className="text-sm whitespace-pre-line">{r.acceptance_criteria}</p>
+                <RichText pid={pid} text={r.acceptance_criteria} className="text-sm" />
               </div>
             )}
             {r.status === "rejected" && r.rejected_reason && (

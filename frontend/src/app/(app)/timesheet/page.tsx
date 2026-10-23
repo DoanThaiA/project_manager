@@ -3,10 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { addDays, addWeeks, format, isToday, parseISO, startOfWeek } from "date-fns";
 import { vi } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, ImageIcon } from "lucide-react";
 import { useState } from "react";
 
 import { WorkLogModal } from "@/components/project/work-log-form";
+import { inlineImageNames, withoutImages } from "@/components/text-images";
 import { Button, IconButton } from "@/components/ui/button";
 import { Card, CardHeader, Empty, PageHeader, Spinner, Table } from "@/components/ui/misc";
 import { api } from "@/lib/api";
@@ -163,7 +164,12 @@ export default function TimesheetPage() {
                     </span>
                     <span className="w-12 shrink-0 font-semibold tabular-nums">{fmtHours(l.hours)}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate">{l.description}</span>
+                      <span className="flex items-center gap-1">
+                        <span className="truncate">{withoutImages(l.description)}</span>
+                        {inlineImageNames(l.description).length > 0 && (
+                          <ImageIcon className="size-3.5 shrink-0 text-ink-3" aria-label="Có ảnh" />
+                        )}
+                      </span>
                       <span className="text-xs text-ink-3">
                         {projectName.get(l.project_id) ?? `#${l.project_id}`} · {ACTIVITY_TYPE[l.activity_type]}
                       </span>

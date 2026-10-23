@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     attachments,
     auth,
     customers,
+    inline_images,
     projects,
     reports,
     requirements,
@@ -27,6 +28,9 @@ api_router.include_router(
 )
 api_router.include_router(work_items.router, prefix="/projects/{project_id}/work-items", tags=["Backlog / Công việc"])
 api_router.include_router(attachments.router, prefix="/projects/{project_id}/work-items", tags=["Backlog / Công việc"])
+api_router.include_router(
+    inline_images.router, prefix="/projects/{project_id}/inline-images", tags=["Ảnh trong văn bản"]
+)
 api_router.include_router(work_logs.router, prefix="/projects/{project_id}/work-logs", tags=["Log công việc"])
 api_router.include_router(reports.router, prefix="/projects/{project_id}", tags=["Báo cáo & Nhật ký"])
 api_router.include_router(reports.system_router, prefix="/activity-logs", tags=["Báo cáo & Nhật ký"])

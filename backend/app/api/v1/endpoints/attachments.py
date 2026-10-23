@@ -20,9 +20,22 @@ logger = logging.getLogger(__name__)
 ENTITY = "work_item"
 
 
-def _out(att: Attachment) -> AttachmentOut:
+def attachment_out(att: Attachment) -> AttachmentOut:
     fields = {name: getattr(att, name) for name in AttachmentOut.model_fields if name != "url"}
     return AttachmentOut(**fields, url=storage.image_url(att.storage_key))
+
+
+async def read_image(file: UploadFile) -> tuple[bytes, str, str]:
+    """Đọc file tải lên, kiểm tra dung lượng và đúng là ảnh; trả về (nội dung, mime, tên file)."""
+    max_bytes = settings.attachment_max_mb * 1024 * 1024
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Ảnh vượt quá {settings.attachment_max_mb} MB")
+    detected = storage.detect_image(data)
+    if detected is None:
+        raise HTTPException(status_code=422, detail="Chỉ nhận ảnh PNG, JPEG, GIF hoặc WebP")
+    mime, ext = detected
+    return data, mime, (file.filename or f"image.{ext}")[:255]
 
 
 @router.get("/{item_id}/attachments", response_model=list[AttachmentOut], summary="Ảnh đính kèm của công việc")
@@ -37,7 +50,7 @@ async def list_attachments(
         .where(Attachment.entity_type == ENTITY, Attachment.entity_id == item_id)
         .order_by(Attachment.created_at, Attachment.id)
     )
-    return [_out(a) for a in rows]
+    return [attachment_out(a) for a in rows]
 
 
 @router.post(
@@ -54,16 +67,7 @@ async def upload_attachment(
     db: AsyncSession = Depends(get_db),
 ):
     await get_work_item(db, ctx.project.id, item_id)
-    max_bytes = settings.attachment_max_mb * 1024 * 1024
-    data = await file.read(max_bytes + 1)
-    if len(data) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"Ảnh vượt quá {settings.attachment_max_mb} MB")
-    detected = storage.detect_image(data)
-    if detected is None:
-        raise HTTPException(status_code=422, detail="Chỉ nhận ảnh PNG, JPEG, GIF hoặc WebP")
-    mime, ext = detected
-    file_name = (file.filename or f"image.{ext}")[:255]
-
+    data, mime, file_name = await read_image(file)
     image_id = await storage.upload_image(
         data, file_name, mime, {"project_id": ctx.project.id, "work_item_id": item_id, "category": category}
     )
@@ -84,7 +88,7 @@ async def upload_attachment(
     except Exception:
         await storage.delete_image(image_id)  # không để ảnh mồ côi trên Cloudflare
         raise
-    return _out(att)
+    return attachment_out(att)
 
 
 @router.delete("/{item_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Xoá ảnh")

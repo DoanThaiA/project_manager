@@ -4,7 +4,7 @@ import { mergeAttributes, Node } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
-import { Dropcursor, Gapcursor, UndoRedo } from "@tiptap/extensions";
+import { Dropcursor, Gapcursor, Placeholder, UndoRedo } from "@tiptap/extensions";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import {
   type Editor,
@@ -14,68 +14,83 @@ import {
   type ReactNodeViewProps,
   useEditor,
 } from "@tiptap/react";
-import { ImageOff, Loader2 } from "lucide-react";
-import { createContext, useContext, useEffect, useRef } from "react";
+import { ImageOff, Loader2, ZoomIn } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
-import {
-  imageMarker,
-  parseImageMarker,
-  type WorkItemImagesState,
-} from "@/components/project/work-item-images";
-import type { AttachmentCategory } from "@/lib/types";
+import { ImageViewerModal, type TextImage, type TextImageSource } from "@/components/text-images";
 import { cn } from "@/lib/utils";
 
 // Node view render qua portal bên trong EditorContent nên đọc được context này
-const ImagesContext = createContext<WorkItemImagesState | null>(null);
+const ImagesContext = createContext<{ source: TextImageSource; view: (image: TextImage) => void } | null>(null);
 
-function ImageView({ node }: ReactNodeViewProps) {
-  const images = useContext(ImagesContext);
-  const { category, name } = node.attrs as { category: AttachmentCategory; name: string };
-  const thumb = images?.find(category, name);
+function ImageView({ node, editor }: ReactNodeViewProps) {
+  const ctx = useContext(ImagesContext);
+  const marker = node.attrs.marker as string;
+  const image = ctx?.source.find(marker);
+  const view = () => image && ctx?.view(image);
   return (
     <NodeViewWrapper className="my-1.5" data-drag-handle>
-      {thumb ? (
-        <span className="relative inline-block">
+      {image ? (
+        <span className="group relative inline-block">
           {/* eslint-disable-next-line @next/next/no-img-element -- ảnh từ Cloudflare Images, không qua next/image */}
           <img
-            src={thumb.src}
-            alt={name}
-            title={name}
-            className="max-h-60 max-w-full rounded-md border border-line"
+            src={image.src}
+            alt={image.name}
+            title={editor.isEditable ? `${image.name} — bấm đúp để phóng to` : image.name}
+            // Đang soạn: bấm một lần để chọn ảnh (xoá / kéo thả), bấm đúp để xem; chỉ đọc: bấm để xem
+            onClick={editor.isEditable ? undefined : view}
+            onDoubleClick={view}
+            className={cn(
+              "max-h-60 max-w-full rounded-md border border-line",
+              !editor.isEditable && "cursor-zoom-in",
+            )}
           />
-          {thumb.uploading && (
+          {image.uploading ? (
             <span className="absolute inset-0 grid place-items-center rounded-md bg-surface/60">
               <Loader2 className="size-5 animate-spin text-brand" />
             </span>
+          ) : (
+            editor.isEditable && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  view();
+                }}
+                aria-label={`Xem ảnh ${image.name}`}
+                className="absolute top-1 right-1 rounded-md bg-slate-900/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+              >
+                <ZoomIn className="size-3.5" />
+              </button>
+            )
           )}
         </span>
       ) : (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-3">
-          <ImageOff className="size-3.5" /> {imageMarker(category, name)}
+          <ImageOff className="size-3.5" /> {marker}
         </span>
       )}
     </NodeViewWrapper>
   );
 }
 
-/** Ảnh trong văn bản: khối riêng, lưu xuống thành một dòng dấu [Ảnh lỗi: tên file]. */
+/** Ảnh trong văn bản: khối riêng, lưu xuống thành một dòng dấu ảnh (vd: [Ảnh: tên file]). */
 const InlineImage = Node.create({
-  name: "workItemImage",
+  name: "textImage",
   group: "block",
   atom: true,
   draggable: true,
-  addAttributes: () => ({ category: { default: "bug" }, name: { default: "" } }),
-  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes(HTMLAttributes, { "data-work-item-image": "" })],
+  addAttributes: () => ({ marker: { default: "" } }),
+  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes(HTMLAttributes, { "data-text-image": "" })],
   addNodeView: () => ReactNodeViewRenderer(ImageView),
 });
 
 /** Văn bản thuần (mỗi dòng một đoạn, dòng dấu ảnh thành ảnh) -> nội dung editor. */
-function toDoc(text: string) {
+function toDoc(text: string, isMarker: (line: string) => boolean) {
   return {
     type: "doc",
     content: text.split("\n").map((line) => {
-      const img = parseImageMarker(line);
-      if (img) return { type: InlineImage.name, attrs: img };
+      if (isMarker(line)) return { type: InlineImage.name, attrs: { marker: line } };
       return { type: "paragraph", content: line ? [{ type: "text", text: line }] : [] };
     }),
   };
@@ -83,9 +98,7 @@ function toDoc(text: string) {
 
 function toText(doc: PMNode): string {
   const lines: string[] = [];
-  doc.forEach((node) =>
-    lines.push(node.type.name === InlineImage.name ? imageMarker(node.attrs.category, node.attrs.name) : node.textContent),
-  );
+  doc.forEach((node) => lines.push(node.type.name === InlineImage.name ? node.attrs.marker : node.textContent));
   return lines.join("\n");
 }
 
@@ -96,41 +109,48 @@ function imageFiles(data: DataTransfer | null): File[] {
 }
 
 /**
- * Ô văn bản hiển thị ảnh ngay trong nội dung. Dán (Ctrl+V) / kéo thả ảnh: thêm vào nhóm ảnh `category`
- * của công việc và chèn ảnh tại con trỏ. Giá trị vẫn là văn bản thuần (dấu ảnh mỗi dòng).
+ * Ô văn bản hiển thị ảnh ngay trong nội dung. Dán (Ctrl+V) / kéo thả ảnh: giao cho `source` thêm ảnh
+ * và chèn ảnh tại con trỏ. Giá trị vẫn là văn bản thuần (dấu ảnh mỗi dòng).
  */
 export function ImageTextEditor({
   id,
   value,
   onChange,
-  category,
-  images,
-  editable,
+  source,
+  editable = true,
   rows = 3,
+  placeholder,
+  autoFocus,
+  onSubmit,
+  "aria-label": ariaLabel,
 }: {
-  id: string;
+  id?: string;
   value: string;
   onChange: (value: string) => void;
-  category: AttachmentCategory;
-  images: WorkItemImagesState;
-  editable: boolean;
+  source: TextImageSource;
+  editable?: boolean;
   rows?: number;
+  placeholder?: string;
+  autoFocus?: boolean;
+  /** Ctrl/⌘ + Enter */
+  onSubmit?: () => void;
+  "aria-label"?: string;
 }) {
   // editorProps / onUpdate chỉ gắn một lần lúc tạo editor -> đọc giá trị mới nhất qua ref
-  const latest = useRef({ onChange, images, category });
+  const latest = useRef({ onChange, source, onSubmit });
   useEffect(() => {
-    latest.current = { onChange, images, category };
+    latest.current = { onChange, source, onSubmit };
   });
 
   const editorRef = useRef<Editor | null>(null);
+  const [viewing, setViewing] = useState<TextImage | null>(null);
 
-  /** Thêm ảnh vào nhóm ảnh của công việc và chèn vào văn bản tại `pos` (mặc định: con trỏ). */
+  /** Thêm ảnh qua `source` và chèn vào văn bản tại `pos` (mặc định: con trỏ). */
   const insertImages = (files: File[], pos?: number) => {
-    const { images, category } = latest.current;
-    const names = images.add(files, category);
+    const markers = latest.current.source.add(files);
     const editor = editorRef.current;
-    if (!names.length || !editor) return;
-    const content = names.map((name) => ({ type: InlineImage.name, attrs: { category, name } }));
+    if (!markers.length || !editor) return;
+    const content = markers.map((marker) => ({ type: InlineImage.name, attrs: { marker } }));
     const chain = editor.chain().focus();
     (pos === undefined ? chain.insertContent(content) : chain.insertContentAt(pos, content)).run();
 
@@ -145,15 +165,32 @@ export function ImageTextEditor({
   const editor = useEditor({
     immediatelyRender: false, // Next.js: tránh lệch HTML giữa server và client
     editable,
-    extensions: [Document, Paragraph, Text, UndoRedo, Dropcursor, Gapcursor, InlineImage],
-    content: toDoc(value),
+    autofocus: autoFocus ? "end" : false,
+    extensions: [
+      Document,
+      Paragraph,
+      Text,
+      UndoRedo,
+      Dropcursor,
+      Gapcursor,
+      InlineImage,
+      Placeholder.configure({ placeholder: placeholder ?? "" }),
+    ],
+    content: toDoc(value, source.isMarker),
     editorProps: {
       attributes: {
-        id,
+        ...(id ? { id } : {}),
+        ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         role: "textbox",
         "aria-multiline": "true",
         class: "outline-none",
         style: `min-height: ${rows * 1.625}em`,
+      },
+      handleKeyDown: (_view, event) => {
+        const { onSubmit } = latest.current;
+        if (!onSubmit || event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return false;
+        onSubmit();
+        return true;
       },
       handlePaste: (view, event) => {
         const files = imageFiles(event.clipboardData);
@@ -178,7 +215,9 @@ export function ImageTextEditor({
 
   // Giá trị đổi từ bên ngoài (vd: xoá ảnh ở khu Hình ảnh -> bỏ dấu) thì nạp lại nội dung
   useEffect(() => {
-    if (editor && toText(editor.state.doc) !== value) editor.commands.setContent(toDoc(value), { emitUpdate: false });
+    if (editor && toText(editor.state.doc) !== value) {
+      editor.commands.setContent(toDoc(value, latest.current.source.isMarker), { emitUpdate: false });
+    }
   }, [editor, value]);
 
   useEffect(() => {
@@ -186,7 +225,7 @@ export function ImageTextEditor({
   }, [editor, editable]);
 
   return (
-    <ImagesContext.Provider value={images}>
+    <ImagesContext.Provider value={{ source, view: setViewing }}>
       <EditorContent
         editor={editor}
         className={cn(
@@ -195,10 +234,13 @@ export function ImageTextEditor({
           "focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20",
           // Viền ảnh đang chọn chỉ hiện khi đang soạn (ProseMirror giữ selection cả khi mất focus)
           "[&_.ProseMirror-focused_.ProseMirror-selectednode_:is(img,span)]:ring-2 [&_.ProseMirror-focused_.ProseMirror-selectednode_:is(img,span)]:ring-brand",
+          // Chữ gợi ý khi ô trống (Placeholder gắn data-placeholder + class is-editor-empty vào đoạn đầu)
+          "[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-ink-3 [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
           !editable && "cursor-default bg-subtle text-ink-3",
         )}
         onClick={() => editor?.commands.focus()}
       />
+      {viewing && <ImageViewerModal image={viewing} onClose={() => setViewing(null)} />}
     </ImagesContext.Provider>
   );
 }

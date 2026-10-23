@@ -3,9 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { ImageTextEditor } from "@/components/project/image-text-editor";
 import { EnumSelect, MemberSelect } from "@/components/project/selects";
+import { PASTE_HINT, useInlineImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Textarea } from "@/components/ui/form";
+import { Field, Input } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -68,6 +70,7 @@ export function RequirementFormModal({
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const editing = !!requirement;
   const canAssign = can("requirement.assign");
+  const images = useInlineImages(pid, [form.description, form.acceptance_criteria]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -115,7 +118,7 @@ export function RequirementFormModal({
           <Button
             variant="primary"
             loading={mutation.isPending}
-            disabled={!form.title.trim()}
+            disabled={!form.title.trim() || images.uploading > 0}
             onClick={() => mutation.mutate()}
           >
             {editing ? "Lưu thay đổi" : "Tạo yêu cầu"}
@@ -127,7 +130,7 @@ export function RequirementFormModal({
         className="grid gap-4 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
-          mutation.mutate();
+          if (!images.uploading) mutation.mutate();
         }}
       >
         <Field label="Tiêu đề" required className="sm:col-span-2">
@@ -135,19 +138,26 @@ export function RequirementFormModal({
             <Input id={id} autoFocus value={form.title} onChange={(e) => set("title", e.target.value)} maxLength={500} />
           )}
         </Field>
-        <Field label="Mô tả" className="sm:col-span-2">
+        <Field label="Mô tả" hint={PASTE_HINT} className="sm:col-span-2">
           {(id) => (
-            <Textarea id={id} rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} />
+            <ImageTextEditor
+              id={id}
+              rows={4}
+              value={form.description}
+              onChange={(v) => set("description", v)}
+              source={images.source}
+            />
           )}
         </Field>
-        <Field label="Tiêu chí nghiệm thu" className="sm:col-span-2">
+        <Field label="Tiêu chí nghiệm thu" hint={PASTE_HINT} className="sm:col-span-2">
           {(id) => (
-            <Textarea
+            <ImageTextEditor
               id={id}
               rows={3}
               placeholder="Mỗi tiêu chí một dòng"
               value={form.acceptance_criteria}
-              onChange={(e) => set("acceptance_criteria", e.target.value)}
+              onChange={(v) => set("acceptance_criteria", v)}
+              source={images.source}
             />
           )}
         </Field>

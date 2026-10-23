@@ -15,7 +15,7 @@ def fake_images(monkeypatch):
     images: dict[str, bytes] = {}
 
     async def upload_image(data, file_name, content_type, metadata):
-        image_id = f"img-{len(images) + 1}-{metadata['work_item_id']}"
+        image_id = f"img-{len(images) + 1}-{metadata.get('work_item_id', 'inline')}"
         images[image_id] = data
         return image_id
 
@@ -78,3 +78,23 @@ def test_signed_image_url(monkeypatch):
 
     monkeypatch.setattr(settings, "cf_images_signing_key", "")
     assert storage.image_url("abc") == "https://imagedelivery.net/hash/abc/public"
+
+
+async def test_inline_images_upload_and_resolve(client, login, project_id, fake_images):
+    dev = await login("dev.cuong")
+    url = f"/projects/{project_id}/inline-images"
+
+    up = await client.post(url, files={"file": ("a1b2c3.png", PNG, "image/png")}, headers=dev)
+    assert up.status_code == 201, up.text
+    assert up.json()["file_name"] == "a1b2c3.png" and up.json()["category"] is None
+    await client.post(url, files={"file": ("d4e5f6.png", PNG, "image/png")}, headers=dev)
+
+    resolved = await client.get(url, params={"names": ["a1b2c3.png", "khong-co.png"]}, headers=dev)
+    assert resolved.status_code == 200
+    assert [(a["file_name"], a["url"]) for a in resolved.json()] == [
+        ("a1b2c3.png", "https://imagedelivery.net/hash/img-1-inline/public")
+    ]
+
+    bad = await client.post(url, files={"file": ("x.png", b"<svg/>", "image/png")}, headers=dev)
+    assert bad.status_code == 422
+    assert len(fake_images) == 2

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 export const IMAGE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
 const MAX_MB = 10;
 
-export const PASTE_HINT = "Dán ảnh (Ctrl+V) hoặc kéo thả ảnh vào ô; bấm đúp vào ảnh để phóng to";
+export const PASTE_HINT = "Dán ảnh (Ctrl+V), kéo thả hoặc bấm \"Gắn ảnh\"; bấm đúp vào ảnh để phóng to";
 
 /** Ảnh hiển thị trong ô văn bản / khung xem ảnh. */
 export type TextImage = { src: string; name: string; uploading?: boolean };

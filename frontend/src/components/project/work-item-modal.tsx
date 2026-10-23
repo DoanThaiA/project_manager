@@ -114,7 +114,7 @@ export function WorkItemModal({
   });
 
   const pasteHint = (category: AttachmentCategory) =>
-    canEdit ? `Dán ảnh (Ctrl+V) hoặc kéo thả ảnh vào đây để thêm vào "${CATEGORY_LABEL[category]}"` : undefined;
+    canEdit ? `Dán ảnh (Ctrl+V), kéo thả hoặc bấm "Gắn ảnh" để thêm vào "${CATEGORY_LABEL[category]}"` : undefined;
 
   const requirements = useQuery({
     queryKey: ["project", pid, "requirements", "open-for-link"],

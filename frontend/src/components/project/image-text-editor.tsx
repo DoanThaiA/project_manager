@@ -14,14 +14,17 @@ import {
   type ReactNodeViewProps,
   useEditor,
 } from "@tiptap/react";
-import { ImageOff, Loader2, ZoomIn } from "lucide-react";
+import { ImageOff, ImagePlus, Loader2, ZoomIn } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 
-import { ImageViewerModal, type TextImage, type TextImageSource } from "@/components/text-images";
+import { IMAGE_ACCEPT, ImageViewerModal, type TextImage, type TextImageSource } from "@/components/text-images";
 import { cn } from "@/lib/utils";
 
 // Node view render qua portal bên trong EditorContent nên đọc được context này
-const ImagesContext = createContext<{ source: TextImageSource; view: (image: TextImage) => void } | null>(null);
+const ImagesContext = createContext<{
+  source: TextImageSource;
+  view: (image: TextImage) => void;
+} | null>(null);
 
 function ImageView({ node, editor }: ReactNodeViewProps) {
   const ctx = useContext(ImagesContext);
@@ -40,10 +43,7 @@ function ImageView({ node, editor }: ReactNodeViewProps) {
             // Đang soạn: bấm một lần để chọn ảnh (xoá / kéo thả), bấm đúp để xem; chỉ đọc: bấm để xem
             onClick={editor.isEditable ? undefined : view}
             onDoubleClick={view}
-            className={cn(
-              "max-h-60 max-w-full rounded-md border border-line",
-              !editor.isEditable && "cursor-zoom-in",
-            )}
+            className={cn("max-h-60 max-w-full rounded-md border border-line", !editor.isEditable && "cursor-zoom-in")}
           />
           {image.uploading ? (
             <span className="absolute inset-0 grid place-items-center rounded-md bg-surface/60">
@@ -91,7 +91,10 @@ function toDoc(text: string, isMarker: (line: string) => boolean) {
     type: "doc",
     content: text.split("\n").map((line) => {
       if (isMarker(line)) return { type: InlineImage.name, attrs: { marker: line } };
-      return { type: "paragraph", content: line ? [{ type: "text", text: line }] : [] };
+      return {
+        type: "paragraph",
+        content: line ? [{ type: "text", text: line }] : [],
+      };
     }),
   };
 }
@@ -143,6 +146,7 @@ export function ImageTextEditor({
   });
 
   const editorRef = useRef<Editor | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<TextImage | null>(null);
 
   /** Thêm ảnh qua `source` và chèn vào văn bản tại `pos` (mặc định: con trỏ). */
@@ -150,7 +154,10 @@ export function ImageTextEditor({
     const markers = latest.current.source.add(files);
     const editor = editorRef.current;
     if (!markers.length || !editor) return;
-    const content = markers.map((marker) => ({ type: InlineImage.name, attrs: { marker } }));
+    const content = markers.map((marker) => ({
+      type: InlineImage.name,
+      attrs: { marker },
+    }));
     const chain = editor.chain().focus();
     (pos === undefined ? chain.insertContent(content) : chain.insertContentAt(pos, content)).run();
 
@@ -201,7 +208,10 @@ export function ImageTextEditor({
       handleDrop: (view, event, _slice, moved) => {
         const files = moved ? [] : imageFiles(event.dataTransfer);
         if (!view.editable || !files.length) return false;
-        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        const pos = view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        })?.pos;
         insertImages(files, pos);
         return true;
       },
@@ -216,7 +226,9 @@ export function ImageTextEditor({
   // Giá trị đổi từ bên ngoài (vd: xoá ảnh ở khu Hình ảnh -> bỏ dấu) thì nạp lại nội dung
   useEffect(() => {
     if (editor && toText(editor.state.doc) !== value) {
-      editor.commands.setContent(toDoc(value, latest.current.source.isMarker), { emitUpdate: false });
+      editor.commands.setContent(toDoc(value, latest.current.source.isMarker), {
+        emitUpdate: false,
+      });
     }
   }, [editor, value]);
 
@@ -226,20 +238,50 @@ export function ImageTextEditor({
 
   return (
     <ImagesContext.Provider value={{ source, view: setViewing }}>
-      <EditorContent
-        editor={editor}
+      <div
         className={cn(
-          "max-h-[50vh] w-full cursor-text overflow-y-auto rounded-lg border border-line-strong bg-surface px-3 py-2",
-          "text-sm leading-relaxed text-ink transition-colors",
+          "w-full overflow-hidden rounded-lg border border-line-strong bg-surface transition-colors",
           "focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20",
-          // Viền ảnh đang chọn chỉ hiện khi đang soạn (ProseMirror giữ selection cả khi mất focus)
-          "[&_.ProseMirror-focused_.ProseMirror-selectednode_:is(img,span)]:ring-2 [&_.ProseMirror-focused_.ProseMirror-selectednode_:is(img,span)]:ring-brand",
-          // Chữ gợi ý khi ô trống (Placeholder gắn data-placeholder + class is-editor-empty vào đoạn đầu)
-          "[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-ink-3 [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
-          !editable && "cursor-default bg-subtle text-ink-3",
+          !editable && "bg-subtle",
         )}
-        onClick={() => editor?.commands.focus()}
-      />
+      >
+        <EditorContent
+          editor={editor}
+          className={cn(
+            "max-h-[50vh] w-full cursor-text overflow-y-auto px-3 py-2",
+            "text-sm leading-relaxed text-ink",
+            // Viền ảnh đang chọn chỉ hiện khi đang soạn (ProseMirror giữ selection cả khi mất focus)
+            "[&_.ProseMirror-focused_.ProseMirror-selectednode_:is(img,span)]:ring-2 [&_.ProseMirror-focused_.ProseMirror-selectednode_:is(img,span)]:ring-brand",
+            // Chữ gợi ý khi ô trống (Placeholder gắn data-placeholder + class is-editor-empty vào đoạn đầu)
+            "[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-ink-3 [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
+            !editable && "cursor-default text-ink-3",
+          )}
+          onClick={() => editor?.commands.focus()}
+        />
+        {editable && (
+          <div className="flex border-t border-line px-1.5 py-1">
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-ink-3 transition-colors hover:bg-subtle hover:text-brand"
+            >
+              <ImagePlus className="size-3.5" /> Gắn ảnh
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept={IMAGE_ACCEPT}
+              multiple
+              hidden
+              onChange={(e) => {
+                // Chèn tại vị trí con trỏ cuối cùng trong ô (ProseMirror giữ selection khi mất focus)
+                insertImages(Array.from(e.target.files ?? []));
+                e.target.value = "";
+              }}
+            />
+          </div>
+        )}
+      </div>
       {viewing && <ImageViewerModal image={viewing} onClose={() => setViewing(null)} />}
     </ImagesContext.Provider>
   );

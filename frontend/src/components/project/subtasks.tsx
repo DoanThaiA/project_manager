@@ -126,7 +126,7 @@ export function Subtasks({
         </ul>
       )}
 
-      {canEdit && can("work_item.create") && (
+      {canEdit && can("work_item.create") && parent.status !== "cancelled" && (
         <form
           className="mt-2 flex flex-wrap gap-2"
           onSubmit={(e) => {

@@ -225,7 +225,8 @@ export default function BacklogPage() {
                         return (
                           <li
                             key={w.id}
-                            draggable={canEdit}
+                            // Subtask đi theo sprint của công việc cha: không kéo / chọn sprint riêng
+                            draggable={canEdit && !w.parent_id}
                             onDragStart={(e) => {
                               e.dataTransfer.setData("text/work-item", String(w.id));
                               e.dataTransfer.effectAllowed = "move";
@@ -235,7 +236,12 @@ export default function BacklogPage() {
                               nested && "pl-8",
                             )}
                           >
-                            {canEdit && <GripVertical className="size-4 shrink-0 cursor-grab text-ink-3/50" aria-hidden />}
+                            {canEdit && (
+                              <GripVertical
+                                className={cn("size-4 shrink-0 text-ink-3/50", w.parent_id ? "invisible" : "cursor-grab")}
+                                aria-hidden
+                              />
+                            )}
                             {nested && <CornerDownRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
                             <MetaBadge meta={WORK_ITEM_TYPE[w.type]} dot={false} />
                             <button
@@ -281,6 +287,8 @@ export default function BacklogPage() {
                                   aria-label={`Chuyển ${w.code} sang sprint`}
                                   className="hidden h-7 w-48 text-xs md:block"
                                   pid={pid}
+                                  disabled={!!w.parent_id}
+                                  title={w.parent_id ? "Subtask đi theo sprint của công việc cha" : undefined}
                                   value={w.sprint_id}
                                   onChange={(v) =>
                                     patch.mutate({

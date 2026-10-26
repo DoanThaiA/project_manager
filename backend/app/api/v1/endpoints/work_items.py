@@ -15,6 +15,7 @@ router = APIRouter()
 
 FINISHED = (WorkItemStatus.done, WorkItemStatus.cancelled)
 NOT_STARTED = (WorkItemStatus.backlog, WorkItemStatus.todo)
+CLOSED_SPRINT = (SprintStatus.completed, SprintStatus.cancelled)
 
 
 async def get_work_item(db: AsyncSession, project_id: int, item_id: int) -> WorkItem:
@@ -34,17 +35,30 @@ async def _validate_refs(db: AsyncSession, ctx: ProjectContext, values: dict, it
         sprint = await db.get(Sprint, values["sprint_id"])
         if sprint is None or sprint.project_id != pid:
             raise not_found("sprint")
-        if sprint.status in (SprintStatus.completed, SprintStatus.cancelled):
+        if sprint.status in CLOSED_SPRINT:
             raise HTTPException(status_code=409, detail="Không thể thêm việc vào sprint đã kết thúc / huỷ")
-    if values.get("parent_id"):
-        if values["parent_id"] == item_id:
-            raise HTTPException(status_code=422, detail="Công việc không thể là cha của chính nó")
-        parent = await get_work_item(db, pid, values["parent_id"])
-        # Subtask chỉ một cấp: không tạo subtask cho subtask, công việc đã có subtask không thành subtask được
-        if parent.parent_id is not None:
-            raise HTTPException(status_code=422, detail="Không thể tạo subtask cho một subtask")
-        if item_id is not None and await _subtask_statuses(db, item_id):
-            raise HTTPException(status_code=422, detail="Công việc đang có subtask nên không thể làm subtask")
+
+
+async def _check_parent(db: AsyncSession, project_id: int, parent_id: int, item_id: int | None) -> WorkItem:
+    """Công việc cha hợp lệ cho subtask (`item_id`: công việc đang được gắn làm subtask, None khi tạo mới)."""
+    if parent_id == item_id:
+        raise HTTPException(status_code=422, detail="Công việc không thể là cha của chính nó")
+    parent = await get_work_item(db, project_id, parent_id)
+    # Subtask chỉ một cấp: không tạo subtask cho subtask, công việc đã có subtask không thành subtask được
+    if parent.parent_id is not None or parent.type == WorkItemType.subtask:
+        raise HTTPException(status_code=422, detail="Không thể tạo subtask cho một subtask")
+    if item_id is not None and await _subtask_statuses(db, item_id):
+        raise HTTPException(status_code=422, detail="Công việc đang có subtask nên không thể làm subtask")
+    if parent.status == WorkItemStatus.cancelled:
+        raise HTTPException(status_code=422, detail=f"{parent.code} đã huỷ, không thêm subtask được")
+    # Subtask đi theo sprint của cha: cha nằm trong sprint đã kết thúc thì không thêm vào được nữa
+    if parent.sprint_id is not None:
+        sprint = await db.get(Sprint, parent.sprint_id)
+        if sprint is not None and sprint.status in CLOSED_SPRINT:
+            raise HTTPException(
+                status_code=409, detail=f"{parent.code} thuộc sprint đã kết thúc, không thêm subtask được"
+            )
+    return parent
 
 
 async def _subtask_statuses(db: AsyncSession, parent_id: int) -> list[WorkItemStatus]:
@@ -60,11 +74,12 @@ async def _sync_parent(db: AsyncSession, parent_id: int | None) -> None:
     - Mọi subtask đã xong / huỷ (ít nhất một xong) -> cha 'done'
     - Còn subtask chưa xong mà cha đang 'done' -> cha mở lại 'in_progress'
     - Có subtask đã bắt đầu mà cha còn backlog / todo -> cha 'in_progress'
+    Cha đã huỷ thì giữ nguyên.
     """
     if parent_id is None:
         return
-    parent = await db.get(WorkItem, parent_id)
-    if parent is None or parent.deleted_at is not None:
+    parent = await db.get(WorkItem, parent_id, populate_existing=True)
+    if parent is None or parent.deleted_at is not None or parent.status == WorkItemStatus.cancelled:
         return
     statuses = await _subtask_statuses(db, parent_id)
     if not statuses:
@@ -153,9 +168,11 @@ async def create_work_item(
         db, ctx.user, "work_item.assign", ctx.project.id
     ):
         raise HTTPException(status_code=403, detail="Yêu cầu quyền 'work_item.assign' để giao việc cho người khác")
-    await _validate_refs(db, ctx, values)
+    if body.type == WorkItemType.subtask and not body.parent_id:
+        raise HTTPException(status_code=422, detail="Subtask phải chọn công việc cha")
     if body.parent_id:
         await _inherit_from_parent(db, ctx.project.id, body, values)
+    await _validate_refs(db, ctx, values)
     values.setdefault("status", WorkItemStatus.todo if values.get("sprint_id") else WorkItemStatus.backlog)
     if body.backlog_rank is None:
         values["backlog_rank"] = await db.scalar(
@@ -174,15 +191,15 @@ async def create_work_item(
 
 
 async def _inherit_from_parent(db: AsyncSession, project_id: int, body: WorkItemCreate, values: dict) -> None:
-    """Subtask mới: loại 'subtask', mặc định cùng sprint (nếu sprint còn mở) và cùng yêu cầu với công việc cha."""
-    parent = await get_work_item(db, project_id, body.parent_id)
+    """Subtask mới: loại 'subtask', luôn cùng sprint với công việc cha, mặc định cùng yêu cầu khách hàng."""
+    parent = await _check_parent(db, project_id, body.parent_id, None)
     values["type"] = WorkItemType.subtask
-    if "requirement_id" not in body.model_fields_set and parent.requirement_id:
+    if parent.sprint_id is None:
+        values.pop("sprint_id", None)
+    else:
+        values["sprint_id"] = parent.sprint_id
+    if body.requirement_id is None and parent.requirement_id:
         values["requirement_id"] = parent.requirement_id
-    if "sprint_id" not in body.model_fields_set and parent.sprint_id:
-        sprint = await db.get(Sprint, parent.sprint_id)
-        if sprint is not None and sprint.status not in (SprintStatus.completed, SprintStatus.cancelled):
-            values["sprint_id"] = parent.sprint_id
 
 
 @router.get("/{item_id}", response_model=WorkItemOut)
@@ -209,6 +226,8 @@ async def update_work_item(
         and not await has_permission(db, ctx.user, "work_item.assign", ctx.project.id)
     ):
         raise HTTPException(status_code=403, detail="Yêu cầu quyền 'work_item.assign' để giao việc cho người khác")
+    old_parent_id = item.parent_id
+    await _resolve_parent(db, ctx.project.id, item, values)
     await _validate_refs(db, ctx, values, item_id)
 
     subtasks = await _subtask_statuses(db, item_id)
@@ -217,12 +236,6 @@ async def update_work_item(
             status_code=409,
             detail=f"Còn {open_count} subtask chưa xong — công việc tự chuyển 'Xong' khi mọi subtask xong",
         )
-    if "parent_id" in values:
-        if values["parent_id"] is not None:
-            values["type"] = WorkItemType.subtask
-        elif item.type == WorkItemType.subtask and "type" not in values:
-            values["type"] = WorkItemType.task
-    old_parent_id = item.parent_id
 
     # Di chuyển giữa sprint <-> backlog thì đồng bộ trạng thái
     if "sprint_id" in values and "status" not in values:
@@ -236,12 +249,59 @@ async def update_work_item(
     await db.flush()
     if "sprint_id" in values and subtasks:
         await _move_subtasks(db, item)
+    if values.get("status") == WorkItemStatus.cancelled and subtasks:
+        # Huỷ công việc cha thì huỷ luôn các subtask chưa xong
+        await db.execute(
+            update(WorkItem)
+            .where(WorkItem.parent_id == item.id, WorkItem.deleted_at.is_(None), WorkItem.status.not_in(FINISHED))
+            .values(status=WorkItemStatus.cancelled)
+            .execution_options(synchronize_session=False)
+        )
     await _sync_requirement(db, item)
     await _sync_parent(db, item.parent_id)
     if old_parent_id != item.parent_id:
         await _sync_parent(db, old_parent_id)
     await db.commit()
     return await get_work_item(db, ctx.project.id, item_id)  # completed_at do trigger set
+
+
+async def _resolve_parent(db: AsyncSession, project_id: int, item: WorkItem, values: dict) -> None:
+    """Giữ nhất quán khi sửa: loại 'subtask' <=> có công việc cha, và subtask luôn cùng sprint với cha.
+
+    - Gắn công việc cha -> loại thành 'subtask', sprint theo cha
+    - Đổi loại khác 'subtask' -> gỡ khỏi công việc cha; gỡ cha mà không đổi loại -> thành 'task'
+    - Đổi sprint riêng cho subtask -> báo lỗi (đổi sprint ở công việc cha, subtask đi theo)
+    """
+    if values.get("parent_id") is not None:
+        values["type"] = WorkItemType.subtask
+    elif "type" in values and values["type"] != WorkItemType.subtask:
+        if item.parent_id is not None:
+            values["parent_id"] = None
+    elif "parent_id" in values and item.type == WorkItemType.subtask and "type" not in values:
+        values["type"] = WorkItemType.task
+
+    parent_id = values.get("parent_id", item.parent_id)
+    if values.get("type", item.type) == WorkItemType.subtask and parent_id is None:
+        raise HTTPException(status_code=422, detail="Subtask phải chọn công việc cha")
+    if parent_id is None:
+        return
+    if parent_id != item.parent_id:
+        parent = await _check_parent(db, project_id, parent_id, item.id)
+        if values.get("sprint_id", parent.sprint_id) != parent.sprint_id:
+            raise HTTPException(status_code=422, detail="Subtask phải cùng sprint với công việc cha")
+        if parent.sprint_id != item.sprint_id:
+            values["sprint_id"] = parent.sprint_id
+        else:
+            values.pop("sprint_id", None)
+    elif "sprint_id" in values and values["sprint_id"] != item.sprint_id:
+        raise HTTPException(
+            status_code=422, detail="Subtask đi theo sprint của công việc cha — hãy đổi sprint ở công việc cha"
+        )
+    elif item.status in FINISHED and values.get("status") not in (None, *FINISHED):
+        # Subtask đã xong nằm lại sprint cũ khi cha chuyển sprint; mở lại thì về cùng sprint với cha
+        parent = await get_work_item(db, project_id, parent_id)
+        if parent.sprint_id != item.sprint_id:
+            values["sprint_id"] = parent.sprint_id
 
 
 async def _move_subtasks(db: AsyncSession, parent: WorkItem) -> None:

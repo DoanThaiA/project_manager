@@ -23,7 +23,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useMembers, useProjectPerms } from "@/lib/hooks";
+import { useMembers, useProjectPerms, useSprints } from "@/lib/hooks";
 import { ACTIVITY_TYPE, PRIORITY, WORK_ITEM_STATUS, WORK_ITEM_TYPE } from "@/lib/labels";
 import type {
   AttachmentCategory,
@@ -51,6 +51,7 @@ type FormState = {
   sprint_id: number | null;
   assignee_id: number | null;
   due_date: string;
+  parent_id: number | null;
 };
 
 // Ảnh dán vào Mô tả -> Ảnh lỗi, vào Tiêu chí hoàn thành -> Ảnh sau khi sửa; văn bản giữ dấu [Ảnh lỗi: tên file]
@@ -79,6 +80,7 @@ function initial(item?: WorkItem, defaults?: Partial<FormState>): FormState {
     sprint_id: item?.sprint_id ?? null,
     assignee_id: item?.assignee_id ?? null,
     due_date: item?.due_date ?? "",
+    parent_id: item?.parent_id ?? null,
     ...defaults,
   };
 }
@@ -144,6 +146,54 @@ export function WorkItemModal({
       ).data.items,
   });
 
+  // Công việc có thể làm cha: không phải subtask, chưa huỷ, không nằm trong sprint đã kết thúc
+  const isSubtask = form.type === "subtask";
+  const sprints = useSprints(pid);
+  const sprintName = new Map((sprints.data ?? []).map((s) => [s.id, s.name]));
+  const closedSprints = new Set(
+    (sprints.data ?? []).filter((s) => s.status === "completed" || s.status === "cancelled").map((s) => s.id),
+  );
+  const candidates = useQuery({
+    queryKey: ["project", pid, "work-items", "parent-candidates"],
+    queryFn: async () =>
+      (
+        await api.get<Page<WorkItem>>(`/projects/${pid}/work-items`, {
+          params: {
+            type: ["epic", "story", "task", "bug"],
+            status: ["backlog", "todo", "in_progress", "in_review", "testing", "done"],
+            size: 500,
+          },
+        })
+      ).data.items,
+    enabled: isSubtask,
+  });
+  const parentOptions = (candidates.data ?? []).filter(
+    (w) =>
+      w.id === form.parent_id ||
+      (w.id !== item?.id && !w.parent_id && !(w.sprint_id && closedSprints.has(w.sprint_id))),
+  );
+  // Công việc đang có subtask thì không đổi thành subtask được (chỉ một cấp)
+  const typeOptions =
+    item && item.subtask_count > 0
+      ? (Object.fromEntries(Object.entries(WORK_ITEM_TYPE).filter(([k]) => k !== "subtask")) as typeof WORK_ITEM_TYPE)
+      : WORK_ITEM_TYPE;
+
+  /** Chọn công việc cha: sprint theo cha (backlog <-> todo như khi đổi sprint), mặc định cùng yêu cầu khách hàng. */
+  function chooseParent(id: number | null) {
+    const p = parentOptions.find((w) => w.id === id);
+    setForm((f) => {
+      if (!p) return { ...f, parent_id: id };
+      const sprint_id = p.sprint_id;
+      return {
+        ...f,
+        parent_id: p.id,
+        sprint_id,
+        status: sprint_id && f.status === "backlog" ? "todo" : !sprint_id && f.status === "todo" ? "backlog" : f.status,
+        requirement_id: f.requirement_id ?? p.requirement_id,
+      };
+    });
+  }
+
   const parent = useQuery({
     queryKey: ["project", pid, "work-items", item?.parent_id],
     queryFn: async () => (await api.get<WorkItem>(`/projects/${pid}/work-items/${item!.parent_id}`)).data,
@@ -178,6 +228,7 @@ export function WorkItemModal({
         sprint_id: form.sprint_id,
         assignee_id: form.assignee_id,
         due_date: form.due_date || null,
+        parent_id: form.parent_id,
       };
       if (editing) {
         // Chỉ gửi trường đã đổi để không đụng quyền giao việc khi không cần
@@ -242,7 +293,8 @@ export function WorkItemModal({
             )}
             <Button onClick={onClose}>Đóng</Button>
             {canEdit && (
-              <Button variant="primary" loading={save.isPending} disabled={!form.title.trim() || inline.uploading > 0} onClick={() => save.mutate()}>
+              <Button variant="primary" loading={save.isPending} disabled={!form.title.trim() || inline.uploading > 0 || (isSubtask && !form.parent_id)}
+                onClick={() => save.mutate()}>
                 {editing ? "Lưu" : "Tạo công việc"}
               </Button>
             )}
@@ -263,11 +315,43 @@ export function WorkItemModal({
         )}
         <fieldset disabled={!canEdit} className="grid gap-4 sm:grid-cols-6">
           <Field label="Loại" className="sm:col-span-2">
-            {(id) => <EnumSelect id={id} options={WORK_ITEM_TYPE} value={form.type} onChange={(v) => v && set("type", v)} />}
+            {(id) => (
+              <EnumSelect
+                id={id}
+                options={typeOptions}
+                value={form.type}
+                // Bỏ loại subtask thì gỡ luôn công việc cha (backend cũng làm vậy)
+                onChange={(v) => v && setForm((f) => ({ ...f, type: v, parent_id: v === "subtask" ? f.parent_id : null }))}
+              />
+            )}
           </Field>
           <Field label="Tiêu đề" required className="sm:col-span-4">
             {(id) => <Input id={id} autoFocus={!editing} value={form.title} onChange={(e) => set("title", e.target.value)} />}
           </Field>
+          {isSubtask && (
+            <Field
+              label="Công việc cha"
+              required
+              hint="Subtask đi theo sprint của công việc cha; công việc cha tự chuyển Xong khi mọi subtask xong"
+              className="sm:col-span-6"
+            >
+              {(id) => (
+                <Select
+                  id={id}
+                  value={form.parent_id ?? ""}
+                  onChange={(e) => chooseParent(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— Chọn công việc cha —</option>
+                  {parentOptions.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.code} · {w.title}
+                      {w.sprint_id ? ` (${sprintName.get(w.sprint_id) ?? "sprint"})` : " (Backlog)"}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
           <Field label="Mô tả" hint={pasteHint("bug")} className="sm:col-span-6">
             {(id) => (
               <ImageTextEditor
@@ -315,11 +399,16 @@ export function WorkItemModal({
               />
             )}
           </Field>
-          <Field label="Sprint" className="sm:col-span-3">
+          <Field
+            label="Sprint"
+            hint={isSubtask ? "Subtask đi theo sprint của công việc cha" : undefined}
+            className="sm:col-span-3"
+          >
             {(id) => (
               <SprintSelect
                 id={id}
                 pid={pid}
+                disabled={isSubtask}
                 value={form.sprint_id}
                 onChange={(v) =>
                   // Vào sprint: backlog -> todo; về backlog: todo -> backlog (giống backend)

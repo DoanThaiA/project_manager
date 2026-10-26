@@ -101,3 +101,102 @@ async def test_subtasks_follow_parent_sprint(client, login, project_id):
     await client.patch(f"{base}/work-items/{parent['id']}", json={"sprint_id": sprint["id"]}, headers=po)
     sub_now = (await client.get(f"{base}/work-items/{sub['id']}", headers=po)).json()
     assert sub_now["sprint_id"] == sprint["id"] and sub_now["status"] == "todo"
+
+
+async def test_subtask_type_and_parent_stay_consistent(client, login, project_id):
+    po = await login("po.an")
+    base = f"/projects/{project_id}"
+    parent = await _create(client, po, base, title="Cha nhất quán")
+
+    # Chọn loại subtask thì bắt buộc có công việc cha
+    resp = await client.post(f"{base}/work-items", json={"title": "Mồ côi", "type": "subtask"}, headers=po)
+    assert resp.status_code == 422
+    task = await _create(client, po, base, title="Task thường")
+    resp = await client.patch(f"{base}/work-items/{task['id']}", json={"type": "subtask"}, headers=po)
+    assert resp.status_code == 422
+
+    # Đổi loại + chọn cha cùng lúc (như form) -> thành subtask
+    moved = await client.patch(
+        f"{base}/work-items/{task['id']}", json={"type": "subtask", "parent_id": parent["id"]}, headers=po
+    )
+    assert moved.status_code == 200 and moved.json()["parent_id"] == parent["id"]
+
+    # Đổi subtask sang loại khác -> tự gỡ khỏi cha, cha không còn subtask
+    freed = await client.patch(f"{base}/work-items/{task['id']}", json={"type": "bug"}, headers=po)
+    assert freed.json()["parent_id"] is None and freed.json()["type"] == "bug"
+    assert (await client.get(f"{base}/work-items/{parent['id']}", headers=po)).json()["subtask_count"] == 0
+
+
+async def test_subtask_sprint_follows_parent(client, login, project_id):
+    po, sm = await login("po.an"), await login("sm.binh")
+    base = f"/projects/{project_id}"
+    sprint = (
+        await client.post(f"{base}/sprints", json={"start_date": "2027-01-04", "goal": "Theo cha"}, headers=sm)
+    ).json()
+    parent = await _create(client, po, base, title="Cha trong sprint", sprint_id=sprint["id"])
+
+    # Tạo subtask kèm sprint khác (sprint đang chạy) -> vẫn theo sprint của cha
+    active = (await client.get(f"{base}/sprints", params={"status": "active"}, headers=po)).json()
+    other_sprint = (active["items"] if isinstance(active, dict) else active)[0]["id"]
+    assert other_sprint != sprint["id"]
+    sub = await _create(client, po, base, title="Con", parent_id=parent["id"], sprint_id=other_sprint)
+    assert sub["sprint_id"] == sprint["id"] and sub["status"] == "todo"
+
+    # Đổi sprint riêng cho subtask -> lỗi
+    resp = await client.patch(f"{base}/work-items/{sub['id']}", json={"sprint_id": None}, headers=po)
+    assert resp.status_code == 422
+
+    # Gắn công việc trong backlog vào cha -> chuyển theo sprint của cha
+    loose = await _create(client, po, base, title="Đang ở backlog")
+    attached = (
+        await client.patch(f"{base}/work-items/{loose['id']}", json={"parent_id": parent["id"]}, headers=po)
+    ).json()
+    assert attached["sprint_id"] == sprint["id"] and attached["status"] == "todo"
+
+    # Subtask đã xong nằm lại sprint cũ khi cha về backlog; mở lại thì theo cha
+    await client.patch(f"{base}/work-items/{sub['id']}", json={"status": "done"}, headers=po)
+    await client.patch(f"{base}/work-items/{parent['id']}", json={"sprint_id": None}, headers=po)
+    assert (await client.get(f"{base}/work-items/{sub['id']}", headers=po)).json()["sprint_id"] == sprint["id"]
+    reopened = (await client.patch(f"{base}/work-items/{sub['id']}", json={"status": "todo"}, headers=po)).json()
+    assert reopened["sprint_id"] is None
+
+
+async def test_cancelled_parent(client, login, project_id):
+    po = await login("po.an")
+    base = f"/projects/{project_id}"
+    parent = await _create(client, po, base, title="Sẽ huỷ")
+    done = await _create(client, po, base, title="Xong rồi", parent_id=parent["id"])
+    open_ = await _create(client, po, base, title="Còn dở", parent_id=parent["id"])
+    await client.patch(f"{base}/work-items/{done['id']}", json={"status": "done"}, headers=po)
+
+    # Huỷ cha -> huỷ luôn subtask chưa xong, subtask đã xong giữ nguyên
+    await client.patch(f"{base}/work-items/{parent['id']}", json={"status": "cancelled"}, headers=po)
+    assert await _status(client, po, base, open_["id"]) == "cancelled"
+    assert await _status(client, po, base, done["id"]) == "done"
+    # Mọi subtask đã xong / huỷ nhưng cha đã huỷ thì không tự thành Xong
+    assert await _status(client, po, base, parent["id"]) == "cancelled"
+
+    # Không thêm subtask vào công việc đã huỷ
+    resp = await client.post(f"{base}/work-items", json={"title": "x", "parent_id": parent["id"]}, headers=po)
+    assert resp.status_code == 422
+
+
+async def test_parent_in_closed_sprint(client, login, project_id):
+    from sqlalchemy import update
+
+    from app.db.session import AsyncSessionLocal
+    from app.models import Sprint
+
+    po, sm = await login("po.an"), await login("sm.binh")
+    base = f"/projects/{project_id}"
+    sprint = (
+        await client.post(f"{base}/sprints", json={"start_date": "2027-02-01", "goal": "Sẽ đóng"}, headers=sm)
+    ).json()
+    parent = await _create(client, po, base, title="Cha trong sprint đã đóng", sprint_id=sprint["id"])
+    # Không có API huỷ sprint: đóng thẳng trong database test
+    async with AsyncSessionLocal() as db:
+        await db.execute(update(Sprint).where(Sprint.id == sprint["id"]).values(status="cancelled"))
+        await db.commit()
+
+    resp = await client.post(f"{base}/work-items", json={"title": "x", "parent_id": parent["id"]}, headers=po)
+    assert resp.status_code == 409

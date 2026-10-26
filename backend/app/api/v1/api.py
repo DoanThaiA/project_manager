@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     attachments,
     auth,
     customers,
+    files,
     inline_images,
     notifications,
     projects,
@@ -28,14 +29,18 @@ api_router.include_router(sprints.router, prefix="/projects/{project_id}/sprints
 api_router.include_router(
     requirements.router, prefix="/projects/{project_id}/requirements", tags=["Yêu cầu khách hàng"]
 )
+api_router.include_router(
+    files.requirement_router, prefix="/projects/{project_id}/requirements", tags=["Yêu cầu khách hàng"]
+)
 api_router.include_router(work_items.router, prefix="/projects/{project_id}/work-items", tags=["Backlog / Công việc"])
 api_router.include_router(attachments.router, prefix="/projects/{project_id}/work-items", tags=["Backlog / Công việc"])
+api_router.include_router(
+    files.work_item_router, prefix="/projects/{project_id}/work-items", tags=["Backlog / Công việc"]
+)
 api_router.include_router(
     inline_images.router, prefix="/projects/{project_id}/inline-images", tags=["Ảnh trong văn bản"]
 )
 api_router.include_router(work_logs.router, prefix="/projects/{project_id}/work-logs", tags=["Log công việc"])
-api_router.include_router(
-    notifications.router, prefix="/projects/{project_id}/telegram", tags=["Thông báo Telegram"]
-)
+api_router.include_router(notifications.router, prefix="/projects/{project_id}/telegram", tags=["Thông báo Telegram"])
 api_router.include_router(reports.router, prefix="/projects/{project_id}", tags=["Báo cáo & Nhật ký"])
 api_router.include_router(reports.system_router, prefix="/activity-logs", tags=["Báo cáo & Nhật ký"])

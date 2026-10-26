@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models import NotificationSubscription, TelegramChat, TelegramLinkCode, User
 from app.models.enums import NotificationEvent, NotificationScope
 from app.schemas.notification import (
+    BotStatusOut,
     MyTelegramOut,
     ProjectTelegramOut,
     SubscriptionOut,
@@ -21,12 +22,17 @@ from app.schemas.notification import (
 )
 from app.services.common import not_found
 from app.services.notifications import telegram
+from app.services.notifications.worker import status as bot_status
 
 router = APIRouter()
 me_router = APIRouter()
 
 LINK_TTL = timedelta(minutes=15)
 MANAGE = "project.notification.manage"
+
+
+def _bot() -> BotStatusOut:
+    return BotStatusOut(running=bot_status.running, last_poll_at=bot_status.last_poll_at, error=bot_status.error)
 
 
 def _require_configured() -> None:
@@ -123,7 +129,9 @@ async def _my_chat(db: AsyncSession, user: User) -> TelegramChat:
 @me_router.get("/telegram", response_model=MyTelegramOut, summary="Kết nối Telegram của tôi")
 async def get_my_telegram(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chat = await db.scalar(select(TelegramChat).where(TelegramChat.user_id == user.id))
-    return MyTelegramOut(configured=telegram.is_configured(), chat=(await _chat_out(db, [chat]))[0] if chat else None)
+    return MyTelegramOut(
+        configured=telegram.is_configured(), bot=_bot(), chat=(await _chat_out(db, [chat]))[0] if chat else None
+    )
 
 
 @me_router.post("/telegram/link", response_model=TelegramLinkOut, summary="Tạo link kết nối Telegram cá nhân")
@@ -173,7 +181,7 @@ async def list_project_chats(
             select(TelegramChat).where(TelegramChat.project_id == ctx.project.id).order_by(TelegramChat.linked_at)
         )
     )
-    return ProjectTelegramOut(configured=telegram.is_configured(), chats=await _chat_out(db, chats))
+    return ProjectTelegramOut(configured=telegram.is_configured(), bot=_bot(), chats=await _chat_out(db, chats))
 
 
 @router.post("/link", response_model=TelegramLinkOut, summary="Tạo link thêm bot vào group Telegram")

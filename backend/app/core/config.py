@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     cf_images_url_expire_seconds: int = 60 * 60
     attachment_max_mb: int = 10
 
+    # MinIO (S3) lưu file đính kèm (tài liệu, PDF, Excel, zip...) của công việc và yêu cầu; bucket phải có sẵn
+    minio_endpoint: str = ""  # host:port API gọi tới, vd minio.example.com hoặc minio:9000
+    # host:port trình duyệt tải file (URL ký sẵn ghi host này); bỏ trống = minio_endpoint
+    minio_public_endpoint: str = ""
+    minio_secure: bool = True  # https
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
+    minio_bucket: str = "project-manager"
+    minio_region: str = "us-east-1"  # đặt sẵn để ký URL không phải hỏi server
+    file_max_mb: int = 50
+    file_url_expire_seconds: int = 60 * 60
+
     # OCR.space đọc chữ trên ảnh danh thiếp khi thêm người liên hệ (https://ocr.space/ocrapi)
     ocr_space_api_key: str = ""
     ocr_space_url: str = "https://api.ocr.space/parse/image"

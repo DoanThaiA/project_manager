@@ -7,7 +7,11 @@ from app.db.base import Base
 
 
 class Attachment(Base):
-    """File đính kèm dùng chung (entity_type + entity_id); ảnh lưu trên Cloudflare Images (storage_key = image id)."""
+    """File đính kèm dùng chung (entity_type + entity_id).
+
+    storage = 'cloudflare': ảnh trên Cloudflare Images (storage_key = image id);
+    storage = 'minio': file trên MinIO (storage_key = object key).
+    """
 
     __tablename__ = "attachments"
 
@@ -19,6 +23,7 @@ class Attachment(Base):
         String(20), comment="bug: ảnh chụp lỗi; result: ảnh kết quả sau khi sửa"
     )
     file_name: Mapped[str] = mapped_column(String(255))
+    storage: Mapped[str] = mapped_column(String(20), server_default="cloudflare")
     storage_key: Mapped[str] = mapped_column(String(500))
     mime_type: Mapped[str | None] = mapped_column(String(100))
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)

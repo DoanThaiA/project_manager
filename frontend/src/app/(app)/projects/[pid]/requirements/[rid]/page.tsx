@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { ActivityFeed } from "@/components/activity-feed";
 import { useProjectActivityResolver } from "@/lib/activity-resolver";
+import { FileAttachments } from "@/components/project/file-attachments";
 import { ImageTextEditor } from "@/components/project/image-text-editor";
 import { RequirementFormModal } from "@/components/project/requirement-form";
 import { WorkItemModal } from "@/components/project/work-item-modal";
@@ -358,6 +359,17 @@ export default function RequirementDetailPage() {
                 <span className="font-medium">Lý do từ chối:</span> {r.rejected_reason}
               </div>
             )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Tài liệu đính kèm" />
+            <div className="p-4">
+              <FileAttachments
+                pid={pid}
+                base={`/projects/${pid}/requirements/${rid}`}
+                canEdit={can("requirement.update")}
+              />
+            </div>
           </Card>
 
           {can("work_item.view") && (

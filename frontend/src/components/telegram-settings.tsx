@@ -10,7 +10,7 @@ import { Checkbox, Select } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { BOARD_COLUMNS, WORK_ITEM_STATUS } from "@/lib/labels";
-import type { NotificationSubscription, TelegramChat, TelegramLink, WorkItemStatus } from "@/lib/types";
+import type { MyTelegram, NotificationSubscription, TelegramChat, TelegramLink, WorkItemStatus } from "@/lib/types";
 import { cn, fmtDateTime } from "@/lib/utils";
 
 export const STATUS_EVENT = "work_item.status_changed";
@@ -108,11 +108,7 @@ export function TelegramChatCard({
         <div className="min-w-0">
           <p className="flex items-center gap-2 font-medium">
             <span className="truncate">{chat.title || (personal ? "Chat riêng" : "Group")}</span>
-            {chat.is_active ? (
-              <Badge tone="green">Đang nhận</Badge>
-            ) : (
-              <Badge tone="red">Không gửi được</Badge>
-            )}
+            {chat.is_active ? <Badge tone="green">Đang nhận</Badge> : <Badge tone="red">Không gửi được</Badge>}
           </p>
           <p className="text-xs text-ink-3">
             {chat.is_active
@@ -200,5 +196,20 @@ export function TelegramChatCard({
         )}
       </div>
     </div>
+  );
+}
+
+/** Cảnh báo khi bot không nhận được lệnh (chưa chạy, lỗi kết nối, token bị nơi khác dùng). */
+export function BotStatusBanner({ bot }: { bot: MyTelegram["bot"] }) {
+  // Bot hỏi Telegram ~30 giây / lần; quá 2 phút không hỏi được là có vấn đề
+  const [now] = useState(() => Date.now());
+  const stale = !bot.last_poll_at || now - new Date(bot.last_poll_at).getTime() > 2 * 60 * 1000;
+  if (bot.running && !bot.error && !stale) return null;
+  return (
+    <p className="border-b border-line bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+      ⚠️ Bot chưa nhận được lệnh từ Telegram nên chưa liên kết được chat mới.{" "}
+      {bot.error ?? (bot.running ? "Đang kết nối tới Telegram…" : "Tác vụ nhận lệnh của bot không chạy.")} Xem log:{" "}
+      <code>docker compose logs api | grep -i telegram</code>
+    </p>
   );
 }

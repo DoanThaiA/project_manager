@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 
-import { TelegramChatCard, useTelegramLink } from "@/components/telegram-settings";
+import { BotStatusBanner, TelegramChatCard, useTelegramLink } from "@/components/telegram-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, Empty, Spinner } from "@/components/ui/misc";
 import { api } from "@/lib/api";
@@ -55,6 +55,7 @@ export default function ProjectNotificationsPage() {
         />
       ) : (
         <>
+          <BotStatusBanner bot={query.data.bot} />
           {link.waiting && (
             <p className="border-b border-line bg-brand-soft px-4 py-2.5 text-sm text-brand">
               Trong Telegram, chọn group để thêm bot — group sẽ tự hiện ở đây. Mỗi người trong dự án tự kết nối

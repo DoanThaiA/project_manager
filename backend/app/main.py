@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,14 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.services.notifications.worker import worker
+
+# Log INFO của ứng dụng (vd: bot Telegram nhận lệnh) ra stdout cùng log uvicorn — xem bằng docker compose logs api
+_app_logger = logging.getLogger("app")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    _app_logger.addHandler(_handler)
+    _app_logger.setLevel(logging.INFO)
 
 
 @asynccontextmanager

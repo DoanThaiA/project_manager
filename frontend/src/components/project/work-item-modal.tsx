@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { FileAttachments } from "@/components/project/file-attachments";
 import { ImageTextEditor } from "@/components/project/image-text-editor";
 import {
   CATEGORY_LABEL,
@@ -343,6 +344,15 @@ export function WorkItemModal({
         </fieldset>
 
         <WorkItemImages images={images} />
+
+        <section className="mt-6">
+          <h4 className="mb-2 text-[13px] font-semibold text-ink-2">File đính kèm</h4>
+          {item ? (
+            <FileAttachments pid={pid} base={`/projects/${pid}/work-items/${item.id}`} canEdit={canEdit} />
+          ) : (
+            <p className="text-sm text-ink-3">Lưu công việc trước rồi mở lại để đính kèm file.</p>
+          )}
+        </section>
 
         {editing && logs.data && (
           <section className="mt-6">

@@ -11,18 +11,23 @@ from app.db.session import get_db
 from app.models import Attachment
 from app.models.enums import AttachmentCategory
 from app.schemas.attachment import AttachmentOut
-from app.services import storage
+from app.services import file_storage, storage
 from app.services.common import not_found
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ENTITY = "work_item"
+IMAGE = Attachment.storage == "cloudflare"  # file trên MinIO có endpoint riêng (files.py)
 
 
 def attachment_out(att: Attachment) -> AttachmentOut:
     fields = {name: getattr(att, name) for name in AttachmentOut.model_fields if name != "url"}
-    return AttachmentOut(**fields, url=storage.image_url(att.storage_key))
+    if att.storage == "minio":
+        url = file_storage.download_url(att.storage_key, att.file_name)
+    else:
+        url = storage.image_url(att.storage_key)
+    return AttachmentOut(**fields, url=url)
 
 
 async def read_image(file: UploadFile) -> tuple[bytes, str, str]:
@@ -47,7 +52,7 @@ async def list_attachments(
     await get_work_item(db, ctx.project.id, item_id)
     rows = await db.scalars(
         select(Attachment)
-        .where(Attachment.entity_type == ENTITY, Attachment.entity_id == item_id)
+        .where(Attachment.entity_type == ENTITY, Attachment.entity_id == item_id, IMAGE)
         .order_by(Attachment.created_at, Attachment.id)
     )
     return [attachment_out(a) for a in rows]
@@ -99,7 +104,13 @@ async def delete_attachment(
     db: AsyncSession = Depends(get_db),
 ):
     att = await db.get(Attachment, attachment_id)
-    if att is None or att.project_id != ctx.project.id or att.entity_type != ENTITY or att.entity_id != item_id:
+    if (
+        att is None
+        or att.project_id != ctx.project.id
+        or att.entity_type != ENTITY
+        or att.entity_id != item_id
+        or att.storage == "minio"
+    ):
         raise not_found("ảnh đính kèm")
     image_id = att.storage_key
     await db.delete(att)

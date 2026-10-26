@@ -33,11 +33,19 @@ class TelegramLinkOut(BaseModel):
     expires_at: datetime
 
 
+class BotStatusOut(BaseModel):
+    running: bool  # tác vụ nhận lệnh của bot đang chạy trong API
+    last_poll_at: datetime | None  # lần gần nhất hỏi Telegram thành công (~30 giây / lần)
+    error: str | None
+
+
 class MyTelegramOut(BaseModel):
     configured: bool  # máy chủ đã đặt TELEGRAM_BOT_TOKEN
+    bot: BotStatusOut
     chat: TelegramChatOut | None
 
 
 class ProjectTelegramOut(BaseModel):
     configured: bool
+    bot: BotStatusOut
     chats: list[TelegramChatOut]

@@ -741,6 +741,41 @@ export interface paths {
         patch: operations["update_comment_api_v1_projects__project_id__requirements__requirement_id__comments__comment_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/requirements/{entity_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File đính kèm */
+        get: operations["list_files_api_v1_projects__project_id__requirements__entity_id__files_get"];
+        put?: never;
+        /** Tải file đính kèm lên MinIO */
+        post: operations["upload_file_api_v1_projects__project_id__requirements__entity_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/requirements/{entity_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xoá file đính kèm */
+        delete: operations["delete_file_api_v1_projects__project_id__requirements__entity_id__files__file_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/work-items": {
         parameters: {
             query?: never;
@@ -808,6 +843,41 @@ export interface paths {
         post?: never;
         /** Xoá ảnh */
         delete: operations["delete_attachment_api_v1_projects__project_id__work_items__item_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/work-items/{entity_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File đính kèm */
+        get: operations["list_files_api_v1_projects__project_id__work_items__entity_id__files_get"];
+        put?: never;
+        /** Tải file đính kèm lên MinIO */
+        post: operations["upload_file_api_v1_projects__project_id__work_items__entity_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/work-items/{entity_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xoá file đính kèm */
+        delete: operations["delete_file_api_v1_projects__project_id__work_items__entity_id__files__file_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1127,10 +1197,29 @@ export interface components {
             file: string;
             category: components["schemas"]["AttachmentCategory"];
         };
+        /** Body_upload_file_api_v1_projects__project_id__requirements__entity_id__files_post */
+        Body_upload_file_api_v1_projects__project_id__requirements__entity_id__files_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_file_api_v1_projects__project_id__work_items__entity_id__files_post */
+        Body_upload_file_api_v1_projects__project_id__work_items__entity_id__files_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_inline_image_api_v1_projects__project_id__inline_images_post */
         Body_upload_inline_image_api_v1_projects__project_id__inline_images_post: {
             /** File */
             file: string;
+        };
+        /** BotStatusOut */
+        BotStatusOut: {
+            /** Running */
+            running: boolean;
+            /** Last Poll At */
+            last_poll_at: string | null;
+            /** Error */
+            error: string | null;
         };
         /** CommentCreate */
         CommentCreate: {
@@ -1399,6 +1488,7 @@ export interface components {
         MyTelegramOut: {
             /** Configured */
             configured: boolean;
+            bot: components["schemas"]["BotStatusOut"];
             chat: components["schemas"]["TelegramChatOut"] | null;
         };
         /**
@@ -1621,6 +1711,7 @@ export interface components {
         ProjectTelegramOut: {
             /** Configured */
             configured: boolean;
+            bot: components["schemas"]["BotStatusOut"];
             /** Chats */
             chats: components["schemas"]["TelegramChatOut"][];
         };
@@ -4613,6 +4704,105 @@ export interface operations {
             };
         };
     };
+    list_files_api_v1_projects__project_id__requirements__entity_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_file_api_v1_projects__project_id__requirements__entity_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_file_api_v1_projects__project_id__requirements__entity_id__files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_file_api_v1_projects__project_id__requirements__entity_id__files__file_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: number;
+                file_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_work_items_api_v1_projects__project_id__work_items_get: {
         parameters: {
             query?: {
@@ -4864,6 +5054,105 @@ export interface operations {
             path: {
                 item_id: number;
                 attachment_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_api_v1_projects__project_id__work_items__entity_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_file_api_v1_projects__project_id__work_items__entity_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_file_api_v1_projects__project_id__work_items__entity_id__files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_file_api_v1_projects__project_id__work_items__entity_id__files__file_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: number;
+                file_id: number;
                 project_id: number;
             };
             cookie?: never;

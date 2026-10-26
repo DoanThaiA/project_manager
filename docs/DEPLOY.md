@@ -87,7 +87,7 @@ Chỉ cần proxy tới `web` — Next.js tự chuyển `/api/*` sang FastAPI tr
 ```nginx
 server {
     server_name pm.congty.vn;
-    client_max_body_size 20m;
+    client_max_body_size 60m;   # file đính kèm tối đa 50 MB (FILE_MAX_MB)
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -167,6 +167,31 @@ webhook, không cần mở port; container API chỉ cần gọi ra được `ht
 Nhiều công việc đổi trạng thái trong cùng một thao tác (vd kết thúc sprint) được gộp thành một tin. Telegram lỗi
 thì tin được gửi lại (30 giây → 1 giờ, tối đa 5 lần); bot bị xoá khỏi group / bị chặn thì chat đó ngừng nhận
 cho tới khi liên kết lại hoặc bấm *Gửi thử* thành công. Xem lỗi: `docker compose logs -f api | grep -i telegram`.
+
+## 11. File đính kèm trên MinIO
+
+File đính kèm (tài liệu, PDF, Excel, zip...) của **công việc** và **yêu cầu khách hàng** được API tải lên
+MinIO (S3); database chỉ lưu object key (bảng `attachments`, `storage = 'minio'`). Ảnh lỗi / ảnh kết quả
+và ảnh dán trong văn bản vẫn ở Cloudflare Images (mục 8). Chưa cấu hình thì tải file trả lỗi 503.
+
+1. Trên MinIO tạo **bucket** riêng (vd `project-manager`), để **private** (không bật anonymous access).
+2. Tạo access key có quyền trên bucket đó: `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`.
+3. Điền vào `.env` rồi `docker compose up -d --build api`:
+
+| Biến | Giá trị |
+|---|---|
+| `MINIO_ENDPOINT` | host:port API gọi tới MinIO (không kèm `https://`), vd `minio.example.com` |
+| `MINIO_PUBLIC_ENDPOINT` | host trình duyệt tải file, nếu khác `MINIO_ENDPOINT` (vd API gọi `minio:9000` trong mạng docker) |
+| `MINIO_SECURE` | `true` nếu dùng https |
+| `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | key ở bước 2 |
+| `MINIO_BUCKET` | bucket ở bước 1 |
+
+Trình duyệt tải file **thẳng từ MinIO** qua link ký tạm (hết hạn sau 1 giờ, `FILE_URL_EXPIRE_SECONDS`), nên
+`MINIO_PUBLIC_ENDPOINT` (hoặc `MINIO_ENDPOINT`) phải truy cập được từ máy người dùng. Nếu MinIO nằm sau
+reverse proxy, proxy phải giữ nguyên header `Host` (link ký theo host), nếu không MinIO trả `SignatureDoesNotMatch`.
+
+Giới hạn: tối đa 50 MB mỗi file (`FILE_MAX_MB`). Nginx trước web cần `client_max_body_size` lớn hơn mức này
+(mục 6 đã đặt `60m`; đổi `FILE_MAX_MB` thì đổi theo).
 
 ## Cập nhật phiên bản
 

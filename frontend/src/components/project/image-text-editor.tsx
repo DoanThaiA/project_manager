@@ -14,7 +14,7 @@ import {
   type ReactNodeViewProps,
   useEditor,
 } from "@tiptap/react";
-import { Download, ImageOff, ImagePlus, Loader2, Paperclip, ZoomIn } from "lucide-react";
+import { ImageOff, ImagePlus, Loader2, Paperclip, ZoomIn } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 import {
@@ -94,29 +94,10 @@ const InlineImage = Node.create({
 function FileView({ node, editor }: ReactNodeViewProps) {
   const ctx = useContext(ImagesContext);
   const marker = node.attrs.marker as string;
-  const file = ctx?.source.files?.find(marker);
-  if (!editor.isEditable || !file?.url) {
-    return (
-      <NodeViewWrapper className="my-1" data-drag-handle>
-        <FileChip file={file} missing={marker} />
-      </NodeViewWrapper>
-    );
-  }
-  // Đang soạn: bấm để chọn file (xoá / kéo thả), nút tải riêng bên cạnh
+  // Đang soạn: bấm vào file để chọn (xoá / kéo thả); xem / tải bằng nút bên cạnh
   return (
     <NodeViewWrapper className="my-1" data-drag-handle>
-      <span className="inline-flex max-w-full items-center gap-1">
-        <FileChip file={{ ...file, url: undefined }} />
-        <a
-          href={file.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Tải ${file.name}`}
-          className="rounded-md p-1 text-ink-3 hover:bg-subtle hover:text-brand"
-        >
-          <Download className="size-3.5" />
-        </a>
-      </span>
+      <FileChip file={ctx?.source.files?.find(marker)} missing={marker} editing={editor.isEditable} />
     </NodeViewWrapper>
   );
 }

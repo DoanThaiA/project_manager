@@ -1,9 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Paperclip, Trash2, X } from "lucide-react";
+import { Download, Eye, Loader2, Paperclip, Trash2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { FilePreviewModal, type PreviewFile } from "@/components/file-preview";
 import { fmtBytes, FileTypeIcon, pickFiles } from "@/components/text-images";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -92,7 +93,13 @@ export function FileAttachments({ files }: { files: FileAttachmentsState }) {
   const { byId } = useMembers(files.pid);
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [previewing, setPreviewing] = useState<PreviewFile | null>(null);
   const saved = files.saved.data ?? [];
+  const previewOf = (f: Attachment): PreviewFile | null =>
+    f.preview_kind && f.preview_url
+      ? { name: f.file_name, url: f.url, previewKind: f.preview_kind, previewUrl: f.preview_url }
+      : null;
+  const iconButton = "rounded-md p-1 text-ink-3 hover:bg-subtle hover:text-brand";
   const empty = !saved.length && !files.pending.length && !files.uploading.length;
 
   return (
@@ -104,37 +111,60 @@ export function FileAttachments({ files }: { files: FileAttachmentsState }) {
       ) : (
         !empty && (
           <ul className="divide-y divide-line rounded-lg border border-line">
-            {saved.map((f) => (
-              <li key={f.id} className="group flex items-center gap-3 px-3 py-2 text-sm">
-                <FileTypeIcon name={f.file_name} />
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={f.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block truncate font-medium text-ink hover:text-brand hover:underline"
-                    title={`Tải ${f.file_name}`}
-                  >
-                    {f.file_name}
+            {saved.map((f) => {
+              const preview = previewOf(f);
+              return (
+                <li key={f.id} className="group flex items-center gap-3 px-3 py-2 text-sm">
+                  <FileTypeIcon name={f.file_name} />
+                  <div className="min-w-0 flex-1">
+                    {/* Bấm tên: xem ngay nếu loại file xem được, không thì tải về */}
+                    {preview ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewing(preview)}
+                        className="block max-w-full truncate text-left font-medium text-ink hover:text-brand hover:underline"
+                        title={`Xem ${f.file_name}`}
+                      >
+                        {f.file_name}
+                      </button>
+                    ) : (
+                      <a
+                        href={f.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate font-medium text-ink hover:text-brand hover:underline"
+                        title={`Tải ${f.file_name}`}
+                      >
+                        {f.file_name}
+                      </a>
+                    )}
+                    <p className="text-xs text-ink-3">
+                      {fmtBytes(f.size_bytes)} ·{" "}
+                      {(f.uploaded_by && byId.get(f.uploaded_by)?.full_name) ?? "—"} · {fmtDateTime(f.created_at)}
+                    </p>
+                  </div>
+                  {preview && (
+                    <button type="button" aria-label={`Xem ${f.file_name}`} onClick={() => setPreviewing(preview)} className={iconButton}>
+                      <Eye className="size-3.5" />
+                    </button>
+                  )}
+                  <a href={f.url} target="_blank" rel="noopener noreferrer" aria-label={`Tải ${f.file_name}`} className={iconButton}>
+                    <Download className="size-3.5" />
                   </a>
-                  <p className="text-xs text-ink-3">
-                    {fmtBytes(f.size_bytes)} ·{" "}
-                    {(f.uploaded_by && byId.get(f.uploaded_by)?.full_name) ?? "—"} · {fmtDateTime(f.created_at)}
-                  </p>
-                </div>
-                {files.canEdit && (
-                  <button
-                    type="button"
-                    aria-label={`Xoá ${f.file_name}`}
-                    disabled={files.remove.isPending && files.remove.variables?.id === f.id}
-                    onClick={() => confirm(`Xoá file ${f.file_name}?`) && files.remove.mutate(f)}
-                    className="rounded-md p-1 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-danger-soft hover:text-danger focus:opacity-100"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                )}
-              </li>
-            ))}
+                  {files.canEdit && (
+                    <button
+                      type="button"
+                      aria-label={`Xoá ${f.file_name}`}
+                      disabled={files.remove.isPending && files.remove.variables?.id === f.id}
+                      onClick={() => confirm(`Xoá file ${f.file_name}?`) && files.remove.mutate(f)}
+                      className="rounded-md p-1 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-danger-soft hover:text-danger focus:opacity-100"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
             {files.pending.map((p) => (
               <li key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                 <FileTypeIcon name={p.file.name} />
@@ -206,6 +236,7 @@ export function FileAttachments({ files }: { files: FileAttachmentsState }) {
           />
         </>
       )}
+      {previewing && <FilePreviewModal file={previewing} onClose={() => setPreviewing(null)} />}
     </div>
   );
 }

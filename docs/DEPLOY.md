@@ -206,6 +206,17 @@ file trả lỗi 503, phần còn lại vẫn chạy bình thường.
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | key ở bước 2 |
 | `R2_ENDPOINT` | chỉ đặt khi bucket ở vùng EU: `<account_id>.eu.r2.cloudflarestorage.com` |
 
+**Xem trực tiếp không cần tải về** (bấm vào tên file hoặc nút 👁):
+
+| Loại file | Cách xem |
+|---|---|
+| PDF, ảnh, video (mp4, webm, mov), audio (mp3, wav, m4a...) | trình duyệt hiển thị thẳng từ R2 |
+| Văn bản / mã nguồn (txt, csv, json, md, log, html, svg...) | hiện dạng chữ thuần — HTML / SVG chỉ hiện mã, không chạy |
+| Word, Excel, PowerPoint | qua **Microsoft Office Online** — Microsoft tải file bằng link ký tạm; tài liệu không được gửi ra ngoài thì đặt `FILE_OFFICE_PREVIEW=false` (khi đó chỉ tải về). Office Online giới hạn khoảng 10 MB (Word / PowerPoint), 5 MB (Excel) |
+| Loại khác (zip, rar...) | chỉ tải về |
+
+Content-Type khi xem suy từ đuôi file (không dùng mime người tải lên gửi kèm) để file không thể giả dạng trang web.
+
 Trình duyệt tải file **thẳng từ R2** qua link ký tạm (hết hạn sau 1 giờ, `FILE_URL_EXPIRE_SECONDS`), không đi
 qua API; tải lên thì đi qua API (kiểm tra quyền, dung lượng). R2 không tính phí băng thông tải xuống.
 

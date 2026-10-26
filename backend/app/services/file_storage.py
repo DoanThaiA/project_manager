@@ -5,6 +5,7 @@ thư viện `minio`. Trình duyệt tải file thẳng từ R2 qua URL ký sẵn
 file_url_expire_seconds, luôn kèm Content-Disposition: attachment.
 """
 
+import mimetypes
 from datetime import timedelta
 from functools import cache
 from typing import BinaryIO
@@ -58,15 +59,68 @@ async def delete(key: str) -> None:
     await run_in_threadpool(client.remove_object, settings.r2_bucket, key)  # không có object cũng không lỗi
 
 
-def download_url(key: str, file_name: str) -> str:
-    """URL tải file ký sẵn; ký offline nên không gọi tới R2."""
+def _disposition(kind: str, file_name: str) -> str:
+    ascii_name = file_name.encode("ascii", "ignore").decode().replace('"', "").strip() or "file"
+    return f"{kind}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(file_name)}"
+
+
+def _presign(key: str, response_headers: dict[str, str]) -> str:
+    """URL ký sẵn; ký offline nên không gọi tới R2."""
     if not is_configured():
         return ""
-    ascii_name = file_name.encode("ascii", "ignore").decode().replace('"', "").strip() or "file"
-    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(file_name)}"
     return _r2().presigned_get_object(
         settings.r2_bucket,
         key,
         expires=timedelta(seconds=settings.file_url_expire_seconds),
-        response_headers={"response-content-disposition": disposition},
+        response_headers=response_headers,
+    )
+
+
+def download_url(key: str, file_name: str) -> str:
+    """URL tải file về máy (Content-Disposition: attachment)."""
+    return _presign(key, {"response-content-disposition": _disposition("attachment", file_name)})
+
+
+# Hiện dạng văn bản thuần. HTML / SVG / XML cũng chỉ hiện mã nguồn: không bao giờ để trình duyệt chạy script trong file
+_TEXT_EXT = {
+    "txt", "log", "md", "csv", "tsv", "json", "xml", "yaml", "yml", "ini", "conf", "env", "sql",
+    "html", "htm", "svg", "css", "js", "ts", "tsx", "jsx", "py", "java", "cs", "php", "go", "rb", "sh", "bat",
+}  # fmt: skip
+_IMAGE_EXT = {"png", "jpg", "jpeg", "gif", "webp", "bmp", "avif"}
+_VIDEO_EXT = {"mp4", "webm", "mov", "m4v", "ogv"}
+_AUDIO_EXT = {"mp3", "wav", "ogg", "m4a", "aac", "flac"}
+_OFFICE_EXT = {"doc", "docx", "xls", "xlsx", "ppt", "pptx"}
+
+
+def preview_kind(file_name: str) -> str | None:
+    """Kiểu xem trực tiếp theo đuôi file (không tin mime do trình duyệt gửi lên); None = chỉ tải về."""
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
+    if ext == "pdf":
+        return "pdf"
+    if ext in _IMAGE_EXT:
+        return "image"
+    if ext in _VIDEO_EXT:
+        return "video"
+    if ext in _AUDIO_EXT:
+        return "audio"
+    if ext in _TEXT_EXT:
+        return "text"
+    if ext in _OFFICE_EXT and settings.file_office_preview:
+        return "office"
+    return None
+
+
+def preview_url(key: str, file_name: str, kind: str) -> str:
+    """URL xem trực tiếp (Content-Disposition: inline). Content-Type suy từ đuôi file, không dùng mime lúc tải lên
+    (người tải lên tự đặt được) — để một file .png không thể được trình duyệt hiển thị như HTML."""
+    if kind == "text":
+        content_type = "text/plain; charset=utf-8"
+    else:
+        content_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+    return _presign(
+        key,
+        {
+            "response-content-disposition": _disposition("inline", file_name),
+            "response-content-type": content_type,
+        },
     )

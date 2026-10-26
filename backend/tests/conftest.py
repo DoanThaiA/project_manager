@@ -110,4 +110,5 @@ def fake_r2(monkeypatch):
     monkeypatch.setattr(file_storage, "upload", upload)
     monkeypatch.setattr(file_storage, "delete", delete)
     monkeypatch.setattr(file_storage, "download_url", lambda key, name: f"https://r2.test/bucket/{key}")
+    monkeypatch.setattr(file_storage, "preview_url", lambda key, name, kind: f"https://r2.test/view/{key}")
     return objects

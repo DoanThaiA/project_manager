@@ -21,14 +21,22 @@ ENTITY = "work_item"
 IMAGE = Attachment.storage == "cloudflare"  # file trên R2 có endpoint riêng (files.py)
 
 
+_COMPUTED = {"url", "preview_kind", "preview_url"}
+
+
 def attachment_out(att: Attachment) -> AttachmentOut:
-    fields = {name: getattr(att, name) for name in AttachmentOut.model_fields if name != "url"}
-    if att.storage == file_storage.STORAGE:
-        # File dán trong văn bản: file_name = '<mã>/<tên file>' -> tải về với tên file gốc
-        url = file_storage.download_url(att.storage_key, att.file_name.split("/", 1)[-1])
-    else:
-        url = storage.image_url(att.storage_key)
-    return AttachmentOut(**fields, url=url)
+    fields = {name: getattr(att, name) for name in AttachmentOut.model_fields if name not in _COMPUTED}
+    if att.storage != file_storage.STORAGE:
+        return AttachmentOut(**fields, url=storage.image_url(att.storage_key))
+    # File dán trong văn bản: file_name = '<mã>/<tên file>' -> tải về / xem với tên file gốc
+    name = att.file_name.split("/", 1)[-1]
+    kind = file_storage.preview_kind(name)
+    return AttachmentOut(
+        **fields,
+        url=file_storage.download_url(att.storage_key, name),
+        preview_kind=kind,
+        preview_url=file_storage.preview_url(att.storage_key, name, kind) if kind else None,
+    )
 
 
 async def read_image(file: UploadFile) -> tuple[bytes, str, str]:

@@ -17,6 +17,7 @@ async def test_work_item_files(client, login, project_id, fake_r2):
     assert key.startswith(f"projects/{project_id}/work-items/1/") and key.endswith(".pdf")
     assert content == PDF and mime == "application/pdf"
     assert f["url"] == f"https://r2.test/bucket/{key}"
+    assert f["preview_kind"] == "pdf" and f["preview_url"] == f"https://r2.test/view/{key}"
 
     listed = (await client.get(url, headers=dev)).json()
     assert [a["id"] for a in listed] == [f["id"]]
@@ -162,3 +163,52 @@ async def test_inline_files(client, login, project_id, fake_r2, monkeypatch):
     )
     assert other.status_code == 201
     assert any(k.startswith(f"projects/{project_id}/text/other/") for k in fake_r2)
+
+
+def test_preview_kinds(monkeypatch):
+    from app.core.config import settings
+    from app.services import file_storage
+
+    kinds = {
+        n: file_storage.preview_kind(n)
+        for n in ["a.PDF", "b.png", "c.mp4", "d.mp3", "e.csv", "f.html", "g.svg", "h.docx", "i.zip", "khong-duoi"]
+    }
+    assert kinds == {
+        "a.PDF": "pdf",
+        "b.png": "image",
+        "c.mp4": "video",
+        "d.mp3": "audio",
+        "e.csv": "text",
+        "f.html": "text",
+        "g.svg": "text",
+        "h.docx": "office",
+        "i.zip": None,
+        "khong-duoi": None,
+    }
+    monkeypatch.setattr(settings, "file_office_preview", False)
+    assert file_storage.preview_kind("h.docx") is None
+
+
+def test_preview_url_is_inline_with_safe_content_type(monkeypatch):
+    from app.core.config import settings
+    from app.services import file_storage
+
+    for name, value in {
+        "r2_account_id": "acc123",
+        "r2_access_key_id": "key",
+        "r2_secret_access_key": "secret",
+        "r2_bucket": "pm-files",
+    }.items():
+        monkeypatch.setattr(settings, name, value)
+    file_storage._client.cache_clear()
+
+    def headers(name, kind):
+        qs = parse_qs(urlsplit(file_storage.preview_url("k", name, kind)).query)
+        return unquote(qs["response-content-disposition"][0]), qs["response-content-type"][0]
+
+    disposition, content_type = headers("Báo cáo.pdf", "pdf")
+    assert disposition.startswith("inline;") and content_type == "application/pdf"
+    # HTML chỉ hiện mã nguồn; loại ảnh lấy theo đuôi file chứ không theo mime lúc tải lên
+    assert headers("trang.html", "text")[1] == "text/plain; charset=utf-8"
+    assert headers("anh.png", "image")[1] == "image/png"
+    file_storage._client.cache_clear()

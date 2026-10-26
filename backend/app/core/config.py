@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     r2_endpoint: str = ""
     file_max_mb: int = 50
     file_url_expire_seconds: int = 60 * 60
+    # Xem trước Word / Excel / PowerPoint qua Microsoft Office Online: Microsoft tải file qua link ký tạm.
+    # Tắt nếu tài liệu không được phép gửi ra ngoài (khi đó các file này chỉ tải về được).
+    file_office_preview: bool = True
 
     # OCR.space đọc chữ trên ảnh danh thiếp khi thêm người liên hệ (https://ocr.space/ocrapi)
     ocr_space_api_key: str = ""

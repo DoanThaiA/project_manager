@@ -10,11 +10,14 @@ import {
   FileX,
   ImageIcon,
   ImageOff,
+  Download,
+  Eye,
   Loader2,
   Paperclip,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { FilePreviewModal, type PreviewKind } from "@/components/file-preview";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -32,8 +35,27 @@ export const PASTE_HINT =
 /** Ảnh hiển thị trong ô văn bản / khung xem ảnh. */
 export type TextImage = { src: string; name: string; uploading?: boolean };
 
-/** File (tài liệu, PDF, Excel...) trong ô văn bản; `name` là tên hiển thị (tên file gốc). */
-export type TextFile = { name: string; url?: string; size?: number | null; uploading?: boolean };
+/**
+ * File (tài liệu, PDF, Excel...) trong ô văn bản; `name` là tên hiển thị (tên file gốc), `url` tải về,
+ * `previewUrl` xem trực tiếp trên trình duyệt (nếu loại file xem được).
+ */
+export type TextFile = {
+  name: string;
+  url?: string;
+  size?: number | null;
+  uploading?: boolean;
+  previewKind?: PreviewKind | null;
+  previewUrl?: string | null;
+};
+
+/** TextFile từ bản ghi đính kèm trả về từ API. */
+const toTextFile = (name: string, a: Attachment): TextFile => ({
+  name,
+  url: a.url,
+  size: a.size_bytes,
+  previewKind: a.preview_kind,
+  previewUrl: a.preview_url,
+});
 
 /**
  * Nguồn ảnh cho ô văn bản có ảnh: văn bản lưu mỗi ảnh thành một dòng dấu (vd: [Ảnh: tên file]),
@@ -175,7 +197,7 @@ function useResolvedImages(pid: number | null | undefined, names: string[], enab
 }
 
 type Local = { preview: string; url?: string; uploading: boolean };
-type LocalFile = { size: number; url?: string; uploading: boolean };
+type LocalFile = { size: number; uploading: boolean; saved?: Attachment };
 
 /**
  * Ảnh / file dán trong các ô văn bản của một form. `texts`: giá trị hiện tại của các ô (để tra URL đã lưu).
@@ -253,7 +275,7 @@ export function useInlineImages(pid: number | null | undefined, texts: string[],
           api
             .post<Attachment>(`/projects/${pid}/inline-files`, body)
             .then((res) =>
-              setLocalFiles((m) => ({ ...m, [name]: { size: file.size, url: res.data.url, uploading: false } })),
+              setLocalFiles((m) => ({ ...m, [name]: { size: file.size, uploading: false, saved: res.data } })),
             )
             .catch((err) => {
               toast.error(err);
@@ -265,10 +287,11 @@ export function useInlineImages(pid: number | null | undefined, texts: string[],
       find: (marker) => {
         const name = inlineFileName(marker);
         if (!name) return undefined;
+        const display = fileDisplayName(name);
         const l = localFiles[name];
-        if (l) return { name: fileDisplayName(name), url: l.url, size: l.size, uploading: l.uploading };
+        if (l) return l.saved ? toTextFile(display, l.saved) : { name: display, size: l.size, uploading: l.uploading };
         const a = resolved.data?.get(name);
-        return a ? { name: fileDisplayName(name), url: a.url, size: a.size_bytes } : undefined;
+        return a ? toTextFile(display, a) : undefined;
       },
     },
   };
@@ -277,10 +300,25 @@ export function useInlineImages(pid: number | null | undefined, texts: string[],
   return { source, uploading };
 }
 
-/** Một file trong văn bản: biểu tượng, tên, dung lượng; bấm để tải về. */
-export function FileChip({ file, missing, className }: { file?: TextFile; missing?: string; className?: string }) {
+/**
+ * Một file trong văn bản: biểu tượng, tên, dung lượng. Bấm vào file xem được (PDF, ảnh, Office...) để xem ngay,
+ * file khác thì tải về; nút tải luôn có bên cạnh. `editing`: trong ô đang soạn — bấm vào chip chỉ để chọn
+ * (xoá / kéo thả), xem và tải bằng các nút bên cạnh.
+ */
+export function FileChip({
+  file,
+  missing,
+  editing,
+  className,
+}: {
+  file?: TextFile;
+  missing?: string;
+  editing?: boolean;
+  className?: string;
+}) {
+  const [previewing, setPreviewing] = useState(false);
   const chip = cn(
-    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-1 text-[13px]",
+    "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-1 text-[13px]",
     className,
   );
   if (!file)
@@ -289,6 +327,12 @@ export function FileChip({ file, missing, className }: { file?: TextFile; missin
         <FileX className="size-4 shrink-0" /> <span className="truncate">{missing ?? "Không tìm thấy file"}</span>
       </span>
     );
+
+  const ready = !file.uploading && !!file.url;
+  const preview =
+    ready && file.previewKind && file.previewUrl
+      ? { name: file.name, url: file.url, previewKind: file.previewKind, previewUrl: file.previewUrl }
+      : null;
   const body = (
     <>
       {file.uploading ? (
@@ -300,18 +344,34 @@ export function FileChip({ file, missing, className }: { file?: TextFile; missin
       {file.size != null && <span className="shrink-0 text-xs text-ink-3">{fmtBytes(file.size)}</span>}
     </>
   );
-  return file.url && !file.uploading ? (
-    <a
-      href={file.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={`Tải ${file.name}`}
-      className={cn(chip, "text-ink hover:border-brand hover:text-brand")}
-    >
-      {body}
-    </a>
-  ) : (
-    <span className={chip}>{body}</span>
+  const active = "text-ink hover:border-brand hover:text-brand";
+  const iconButton = "shrink-0 rounded-md p-1 text-ink-3 hover:bg-subtle hover:text-brand";
+
+  return (
+    <span className="inline-flex max-w-full items-center gap-0.5">
+      {editing || !ready ? (
+        <span className={chip}>{body}</span>
+      ) : preview ? (
+        <button type="button" onClick={() => setPreviewing(true)} title={`Xem ${file.name}`} className={cn(chip, active)}>
+          {body}
+        </button>
+      ) : (
+        <a href={file.url} target="_blank" rel="noopener noreferrer" title={`Tải ${file.name}`} className={cn(chip, active)}>
+          {body}
+        </a>
+      )}
+      {editing && preview && (
+        <button type="button" onClick={() => setPreviewing(true)} aria-label={`Xem ${file.name}`} className={iconButton}>
+          <Eye className="size-3.5" />
+        </button>
+      )}
+      {ready && (editing || preview) && (
+        <a href={file.url} target="_blank" rel="noopener noreferrer" aria-label={`Tải ${file.name}`} className={iconButton}>
+          <Download className="size-3.5" />
+        </a>
+      )}
+      {previewing && preview && <FilePreviewModal file={preview} onClose={() => setPreviewing(false)} />}
+    </span>
   );
 }
 
@@ -329,7 +389,7 @@ export function RichText({ pid, text, className }: { pid: number; text: string; 
           return (
             <div key={i} className="my-1">
               {a ? (
-                <FileChip file={{ name: display, url: a.url, size: a.size_bytes }} />
+                <FileChip file={toTextFile(display, a)} />
               ) : resolved.isPending ? (
                 <FileChip file={{ name: display, uploading: true }} />
               ) : (
@@ -416,7 +476,7 @@ function FilesModal({ pid, names, onClose }: { pid: number; names: string[]; onC
           return (
             <li key={n}>
               {a ? (
-                <FileChip file={{ name: display, url: a.url, size: a.size_bytes }} className="w-full" />
+                <FileChip file={toTextFile(display, a)} />
               ) : (
                 <FileChip
                   file={resolved.isPending ? { name: display, uploading: true } : undefined}

@@ -1173,6 +1173,10 @@ export interface components {
             created_at: string;
             /** Url */
             url: string;
+            /** Preview Kind */
+            preview_kind?: ("pdf" | "image" | "video" | "audio" | "text" | "office") | null;
+            /** Preview Url */
+            preview_url?: string | null;
         };
         /** Body_login_api_v1_auth_login_post */
         Body_login_api_v1_auth_login_post: {

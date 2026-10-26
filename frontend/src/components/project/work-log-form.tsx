@@ -44,7 +44,7 @@ export function WorkLogModal({
   const [description, setDescription] = useState(log?.description ?? "");
   const [billable, setBillable] = useState(log?.is_billable ?? true);
   const [remaining, setRemaining] = useState("");
-  const images = useInlineImages(projectId, [description]);
+  const images = useInlineImages(projectId, [description], "work-logs");
 
   const mutation = useMutation({
     mutationFn: async () => {

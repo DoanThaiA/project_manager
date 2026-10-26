@@ -111,6 +111,18 @@ class AttachmentCategory(StrEnum):
     result = "result"  # ảnh kết quả sau khi sửa
 
 
+class TextFileFolder(StrEnum):
+    """Nhóm (folder trên R2) của file gắn trong ô văn bản: projects/<id>/text/<nhóm>/..."""
+
+    work_items = "work-items"  # mô tả / tiêu chí hoàn thành công việc
+    requirements = "requirements"  # mô tả / tiêu chí nghiệm thu yêu cầu
+    requirement_comments = "requirement-comments"  # bình luận yêu cầu
+    requirement_status = "requirement-status"  # ghi chú khi chuyển trạng thái yêu cầu
+    work_logs = "work-logs"  # log công việc
+    sprints = "sprints"  # sprint review / retrospective
+    other = "other"
+
+
 class NotificationEvent(StrEnum):
     """Loại sự kiện gửi thông báo Telegram."""
 

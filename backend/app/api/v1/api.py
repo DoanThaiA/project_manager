@@ -40,6 +40,7 @@ api_router.include_router(
 api_router.include_router(
     inline_images.router, prefix="/projects/{project_id}/inline-images", tags=["Ảnh trong văn bản"]
 )
+api_router.include_router(files.inline_router, prefix="/projects/{project_id}/inline-files", tags=["Ảnh trong văn bản"])
 api_router.include_router(work_logs.router, prefix="/projects/{project_id}/work-logs", tags=["Log công việc"])
 api_router.include_router(notifications.router, prefix="/projects/{project_id}/telegram", tags=["Thông báo Telegram"])
 api_router.include_router(reports.router, prefix="/projects/{project_id}", tags=["Báo cáo & Nhật ký"])

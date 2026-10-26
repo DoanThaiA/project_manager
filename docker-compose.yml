@@ -13,13 +13,11 @@ services:
       CF_IMAGES_TOKEN: ${CF_IMAGES_TOKEN:-}
       CF_IMAGES_ACCOUNT_HASH: ${CF_IMAGES_ACCOUNT_HASH:-}
       CF_IMAGES_SIGNING_KEY: ${CF_IMAGES_SIGNING_KEY:-}
-      # MinIO lưu file đính kèm (tài liệu, PDF, Excel...) của công việc / yêu cầu (xem docs/DEPLOY.md mục 11)
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-}
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-}
-      MINIO_SECURE: ${MINIO_SECURE:-true}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
-      MINIO_BUCKET: ${MINIO_BUCKET:-project-manager}
+      # Cloudflare R2 lưu file đính kèm (tài liệu, PDF, Excel...) (xem docs/DEPLOY.md mục 11)
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-project-manager}
       # OCR.space đọc ảnh danh thiếp khi thêm người liên hệ
       OCR_SPACE_API_KEY: ${OCR_SPACE_API_KEY:-}
       # Thông báo Telegram: bot nhận lệnh bằng long polling nên chỉ cần gọi ra được api.telegram.org

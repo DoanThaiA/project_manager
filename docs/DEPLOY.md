@@ -168,30 +168,52 @@ Nhiều công việc đổi trạng thái trong cùng một thao tác (vd kết 
 thì tin được gửi lại (30 giây → 1 giờ, tối đa 5 lần); bot bị xoá khỏi group / bị chặn thì chat đó ngừng nhận
 cho tới khi liên kết lại hoặc bấm *Gửi thử* thành công. Xem lỗi: `docker compose logs -f api | grep -i telegram`.
 
-## 11. File đính kèm trên MinIO
+## 11. File đính kèm trên Cloudflare R2
 
-File đính kèm (tài liệu, PDF, Excel, zip...) của **công việc** và **yêu cầu khách hàng** được API tải lên
-MinIO (S3); database chỉ lưu object key (bảng `attachments`, `storage = 'minio'`). Ảnh lỗi / ảnh kết quả
-và ảnh dán trong văn bản vẫn ở Cloudflare Images (mục 8). Chưa cấu hình thì tải file trả lỗi 503.
+File đính kèm (tài liệu, PDF, Excel, zip...) được API tải lên Cloudflare R2; database chỉ lưu object key
+(bảng `attachments`, `storage = 'r2'`). Có hai loại:
 
-1. Trên MinIO tạo **bucket** riêng (vd `project-manager`), để **private** (không bật anonymous access).
-2. Tạo access key có quyền trên bucket đó: `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`.
+- **File của công việc / yêu cầu** — khu "File đính kèm" (chọn được ngay khi tạo mới, tải lên sau khi lưu).
+- **File dán trong văn bản** — mọi ô soạn có "Gắn ảnh" đều có thêm "Gắn file" (mô tả, bình luận, ghi chú
+  trạng thái, log công việc, sprint review...); văn bản giữ dấu `[File: <mã>/<tên file>]`.
+
+Mỗi chỗ một folder trong bucket:
+
+```
+projects/<project_id>/work-items/<id>/            File đính kèm của công việc
+projects/<project_id>/requirements/<id>/          Tài liệu đính kèm của yêu cầu
+projects/<project_id>/text/work-items/            gắn trong mô tả / tiêu chí công việc
+projects/<project_id>/text/requirements/          gắn trong mô tả / tiêu chí nghiệm thu yêu cầu
+projects/<project_id>/text/requirement-comments/  bình luận yêu cầu
+projects/<project_id>/text/requirement-status/    ghi chú khi chuyển trạng thái yêu cầu
+projects/<project_id>/text/work-logs/             log công việc
+projects/<project_id>/text/sprints/               sprint review / retrospective
+```
+
+Ảnh (ảnh lỗi / ảnh kết quả, ảnh dán trong văn bản) vẫn ở Cloudflare Images (mục 8). Chưa cấu hình R2 thì tải
+file trả lỗi 503, phần còn lại vẫn chạy bình thường.
+
+1. Cloudflare Dashboard › **R2** › **Create bucket** (vd `project-manager`), để **private** — không bật
+   Public access / custom domain. Ghi lại **Account ID** (cột phải trang R2).
+2. **R2 › Manage R2 API Tokens › Create API token**: quyền **Object Read & Write**, chỉ áp dụng cho bucket
+   ở bước 1. Copy **Access Key ID** và **Secret Access Key** (chỉ hiện một lần).
 3. Điền vào `.env` rồi `docker compose up -d --build api`:
 
 | Biến | Giá trị |
 |---|---|
-| `MINIO_ENDPOINT` | host:port API gọi tới MinIO (không kèm `https://`), vd `minio.example.com` |
-| `MINIO_PUBLIC_ENDPOINT` | host trình duyệt tải file, nếu khác `MINIO_ENDPOINT` (vd API gọi `minio:9000` trong mạng docker) |
-| `MINIO_SECURE` | `true` nếu dùng https |
-| `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | key ở bước 2 |
-| `MINIO_BUCKET` | bucket ở bước 1 |
+| `R2_ACCOUNT_ID` | Account ID ở bước 1 |
+| `R2_BUCKET` | tên bucket ở bước 1 |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | key ở bước 2 |
+| `R2_ENDPOINT` | chỉ đặt khi bucket ở vùng EU: `<account_id>.eu.r2.cloudflarestorage.com` |
 
-Trình duyệt tải file **thẳng từ MinIO** qua link ký tạm (hết hạn sau 1 giờ, `FILE_URL_EXPIRE_SECONDS`), nên
-`MINIO_PUBLIC_ENDPOINT` (hoặc `MINIO_ENDPOINT`) phải truy cập được từ máy người dùng. Nếu MinIO nằm sau
-reverse proxy, proxy phải giữ nguyên header `Host` (link ký theo host), nếu không MinIO trả `SignatureDoesNotMatch`.
+Trình duyệt tải file **thẳng từ R2** qua link ký tạm (hết hạn sau 1 giờ, `FILE_URL_EXPIRE_SECONDS`), không đi
+qua API; tải lên thì đi qua API (kiểm tra quyền, dung lượng). R2 không tính phí băng thông tải xuống.
 
 Giới hạn: tối đa 50 MB mỗi file (`FILE_MAX_MB`). Nginx trước web cần `client_max_body_size` lớn hơn mức này
 (mục 6 đã đặt `60m`; đổi `FILE_MAX_MB` thì đổi theo).
+
+**Đã từng lưu file trên MinIO** (bản trước): migration `0007` đổi các bản ghi sang `r2` và giữ nguyên object key
+— copy toàn bộ bucket MinIO sang bucket R2 (vd `rclone copy minio:<bucket> r2:<bucket>`) để link cũ vẫn tải được.
 
 ## Cập nhật phiên bản
 

@@ -36,6 +36,8 @@ export type WorkItemCreate = S["WorkItemCreate"];
 export type WorkLog = S["WorkLogOut"];
 export type Attachment = S["AttachmentOut"];
 export type AttachmentCategory = NonNullable<Attachment["category"]>;
+/** Nhóm (folder trên R2) của file gắn trong ô văn bản. */
+export type TextFileFolder = S["TextFileFolder"];
 export type WorkLogSummaryRow = S["WorkLogSummaryRow"];
 export type ActivityLog = S["ActivityLogOut"];
 

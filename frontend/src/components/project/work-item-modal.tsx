@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, CornerLeftUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { FileAttachments } from "@/components/project/file-attachments";
+import { FileAttachments, useFileAttachments } from "@/components/project/file-attachments";
 import { ImageTextEditor } from "@/components/project/image-text-editor";
 import {
   CATEGORY_LABEL,
@@ -16,7 +16,7 @@ import {
 import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
 import { Subtasks } from "@/components/project/subtasks";
 import { WorkLogModal } from "@/components/project/work-log-form";
-import { TextImagesButton, withoutImages } from "@/components/text-images";
+import { TextImagesButton, useInlineImages, withoutImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
@@ -117,8 +117,22 @@ export function WorkItemModal({
     },
   });
 
+  const files = useFileAttachments({
+    pid,
+    base: item ? `/projects/${pid}/work-items/${item.id}` : undefined,
+    canEdit,
+  });
+  // File gắn trong Mô tả / Tiêu chí hoàn thành: dấu [File: ...] trong văn bản, như các ô soạn khác
+  const inline = useInlineImages(pid, [form.description, form.acceptance_criteria], "work-items");
+  const textSource = (category: AttachmentCategory) => ({
+    ...textImageSource(images, category),
+    files: inline.source.files,
+  });
+
   const pasteHint = (category: AttachmentCategory) =>
-    canEdit ? `Dán ảnh (Ctrl+V), kéo thả hoặc bấm "Gắn ảnh" để thêm vào "${CATEGORY_LABEL[category]}"` : undefined;
+    canEdit
+      ? `Dán ảnh (Ctrl+V), kéo thả hoặc bấm "Gắn ảnh" để thêm vào "${CATEGORY_LABEL[category]}"; "Gắn file" để đính kèm tài liệu`
+      : undefined;
 
   const requirements = useQuery({
     queryKey: ["project", pid, "requirements", "open-for-link"],
@@ -177,6 +191,8 @@ export function WorkItemModal({
       // Ảnh chọn trong lúc tạo: tải lên sau khi có công việc; lỗi ảnh không làm hỏng việc tạo
       const failed = await images.uploadPending(created.id);
       if (failed) toast.error(`${created.code}: ${failed} ảnh tải lên lỗi — mở lại công việc để thử lại`);
+      const failedFiles = await files.uploadPending(`/projects/${pid}/work-items/${created.id}`);
+      if (failedFiles) toast.error(`${created.code}: ${failedFiles} file tải lên lỗi — mở lại công việc để thử lại`);
       return created;
     },
     onSuccess: (saved) => {
@@ -226,7 +242,7 @@ export function WorkItemModal({
             )}
             <Button onClick={onClose}>Đóng</Button>
             {canEdit && (
-              <Button variant="primary" loading={save.isPending} disabled={!form.title.trim()} onClick={() => save.mutate()}>
+              <Button variant="primary" loading={save.isPending} disabled={!form.title.trim() || inline.uploading > 0} onClick={() => save.mutate()}>
                 {editing ? "Lưu" : "Tạo công việc"}
               </Button>
             )}
@@ -259,7 +275,7 @@ export function WorkItemModal({
                 rows={4}
                 value={form.description}
                 onChange={(v) => set("description", v)}
-                source={textImageSource(images, "bug")}
+                source={textSource("bug")}
                 editable={canEdit}
               />
             )}
@@ -271,7 +287,7 @@ export function WorkItemModal({
                 rows={2}
                 value={form.acceptance_criteria}
                 onChange={(v) => set("acceptance_criteria", v)}
-                source={textImageSource(images, "result")}
+                source={textSource("result")}
                 editable={canEdit}
               />
             )}
@@ -380,11 +396,7 @@ export function WorkItemModal({
 
         <section className="mt-6">
           <h4 className="mb-2 text-[13px] font-semibold text-ink-2">File đính kèm</h4>
-          {item ? (
-            <FileAttachments pid={pid} base={`/projects/${pid}/work-items/${item.id}`} canEdit={canEdit} />
-          ) : (
-            <p className="text-sm text-ink-3">Lưu công việc trước rồi mở lại để đính kèm file.</p>
-          )}
+          <FileAttachments files={files} />
         </section>
 
         {editing && logs.data && (

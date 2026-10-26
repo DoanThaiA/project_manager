@@ -1,54 +1,48 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { File as GenericFile, FileArchive, FileImage, FileSpreadsheet, FileText, Loader2, Paperclip, Trash2 } from "lucide-react";
+import { Loader2, Paperclip, Trash2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { fmtBytes, FileTypeIcon, pickFiles } from "@/components/text-images";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { useMembers } from "@/lib/hooks";
 import type { Attachment } from "@/lib/types";
 import { cn, fmtDateTime } from "@/lib/utils";
 
-export function fmtBytes(n?: number | null) {
-  if (n == null) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function FileIcon({ name, mime }: { name: string; mime?: string | null }) {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  const Icon = mime?.startsWith("image/")
-    ? FileImage
-    : ["xls", "xlsx", "csv", "ods"].includes(ext)
-      ? FileSpreadsheet
-      : ["zip", "rar", "7z", "gz", "tar"].includes(ext)
-        ? FileArchive
-        : ["pdf", "doc", "docx", "txt", "md", "odt", "ppt", "pptx"].includes(ext)
-          ? FileText
-          : GenericFile;
-  return <Icon className="size-4 shrink-0 text-ink-3" />;
-}
-
+/** File chọn khi đang tạo mới — tải lên sau khi bản ghi được tạo. */
+type PendingFile = { id: string; file: File };
 type Uploading = { id: string; name: string; size: number; percent: number };
 
+async function uploadFile(base: string, file: File, onProgress?: (percent: number) => void) {
+  const body = new FormData();
+  body.append("file", file);
+  return (
+    await api.post<Attachment>(`${base}/files`, body, {
+      onUploadProgress: (e) => onProgress?.(e.total ? Math.round((e.loaded / e.total) * 100) : 0),
+    })
+  ).data;
+}
+
+export type FileAttachmentsState = ReturnType<typeof useFileAttachments>;
+
 /**
- * File đính kèm (tài liệu, PDF, Excel, zip...) lưu trên MinIO, cho bản ghi có endpoint `${base}/files`
- * (vd `/projects/1/work-items/5`). Link tải là URL ký tạm nên danh sách được tải lại định kỳ.
+ * File đính kèm (tài liệu, PDF, Excel, zip...) lưu trên Cloudflare R2, cho bản ghi có endpoint `${base}/files`
+ * (vd `/projects/1/work-items/5`). Có `base`: tải thẳng lên ngay; chưa có (form tạo mới): giữ trong `pending`,
+ * gọi uploadPending sau khi tạo bản ghi. Link tải là URL ký tạm nên danh sách được tải lại định kỳ.
  */
-export function FileAttachments({ pid, base, canEdit }: { pid: number; base: string; canEdit: boolean }) {
+export function useFileAttachments({ pid, base, canEdit }: { pid: number; base?: string; canEdit: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const { byId } = useMembers(pid);
-  const input = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
+  const [pending, setPending] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState<Uploading[]>([]);
   const queryKey = ["project", pid, "files", base];
 
-  const files = useQuery({
+  const saved = useQuery({
     queryKey,
     queryFn: async () => (await api.get<Attachment[]>(`${base}/files`)).data,
+    enabled: !!base,
     refetchInterval: 15 * 60 * 1000,
   });
 
@@ -58,21 +52,21 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
     onError: toast.error,
   });
 
-  function upload(list: File[]) {
-    if (!list.length) return;
-    const items = list.map((file) => ({ file, row: { id: crypto.randomUUID(), name: file.name, size: file.size, percent: 0 } }));
-    setUploading((u) => [...u, ...items.map((i) => i.row)]);
+  function add(list: Iterable<File>) {
+    const files = pickFiles(list, toast.error);
+    if (!files.length) return;
+    if (!base) {
+      setPending((p) => [...p, ...files.map((file) => ({ id: crypto.randomUUID(), file }))]);
+      return;
+    }
+    const rows = files.map((file) => ({ file, row: { id: crypto.randomUUID(), name: file.name, size: file.size, percent: 0 } }));
+    setUploading((u) => [...u, ...rows.map((r) => r.row)]);
     void Promise.all(
-      items.map(async ({ file, row }) => {
-        const body = new FormData();
-        body.append("file", file);
+      rows.map(async ({ file, row }) => {
         try {
-          await api.post<Attachment>(`${base}/files`, body, {
-            onUploadProgress: (e) => {
-              const percent = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
-              setUploading((u) => u.map((x) => (x.id === row.id ? { ...x, percent } : x)));
-            },
-          });
+          await uploadFile(base, file, (percent) =>
+            setUploading((u) => u.map((x) => (x.id === row.id ? { ...x, percent } : x))),
+          );
         } catch (err) {
           toast.error(err);
         } finally {
@@ -82,21 +76,37 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
     ).then(() => qc.invalidateQueries({ queryKey }));
   }
 
-  const saved = files.data ?? [];
-  const empty = !saved.length && !uploading.length;
+  /** Tải các file chọn lúc tạo mới lên bản ghi vừa tạo; trả về số file lỗi. */
+  async function uploadPending(newBase: string): Promise<number> {
+    const results = await Promise.allSettled(pending.map((p) => uploadFile(newBase, p.file)));
+    return results.filter((r) => r.status === "rejected").length;
+  }
+
+  const removePending = (id: string) => setPending((p) => p.filter((x) => x.id !== id));
+
+  return { pid, canEdit, saved, pending, uploading, add, remove, removePending, uploadPending };
+}
+
+/** Khu "File đính kèm": danh sách file + ô chọn / kéo thả file. */
+export function FileAttachments({ files }: { files: FileAttachmentsState }) {
+  const { byId } = useMembers(files.pid);
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const saved = files.saved.data ?? [];
+  const empty = !saved.length && !files.pending.length && !files.uploading.length;
 
   return (
     <div>
-      {files.isPending ? (
+      {files.saved.isLoading ? (
         <p className="py-2 text-sm text-ink-3">Đang tải…</p>
-      ) : empty && !canEdit ? (
+      ) : empty && !files.canEdit ? (
         <p className="py-2 text-sm text-ink-3">Chưa có file đính kèm.</p>
       ) : (
         !empty && (
           <ul className="divide-y divide-line rounded-lg border border-line">
             {saved.map((f) => (
               <li key={f.id} className="group flex items-center gap-3 px-3 py-2 text-sm">
-                <FileIcon name={f.file_name} mime={f.mime_type} />
+                <FileTypeIcon name={f.file_name} />
                 <div className="min-w-0 flex-1">
                   <a
                     href={f.url}
@@ -112,12 +122,12 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
                     {(f.uploaded_by && byId.get(f.uploaded_by)?.full_name) ?? "—"} · {fmtDateTime(f.created_at)}
                   </p>
                 </div>
-                {canEdit && (
+                {files.canEdit && (
                   <button
                     type="button"
                     aria-label={`Xoá ${f.file_name}`}
-                    disabled={remove.isPending && remove.variables?.id === f.id}
-                    onClick={() => confirm(`Xoá file ${f.file_name}?`) && remove.mutate(f)}
+                    disabled={files.remove.isPending && files.remove.variables?.id === f.id}
+                    onClick={() => confirm(`Xoá file ${f.file_name}?`) && files.remove.mutate(f)}
                     className="rounded-md p-1 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-danger-soft hover:text-danger focus:opacity-100"
                   >
                     <Trash2 className="size-3.5" />
@@ -125,7 +135,22 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
                 )}
               </li>
             ))}
-            {uploading.map((u) => (
+            {files.pending.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                <FileTypeIcon name={p.file.name} />
+                <span className="min-w-0 flex-1 truncate">{p.file.name}</span>
+                <span className="text-xs text-ink-3">{fmtBytes(p.file.size)} · tải lên khi lưu</span>
+                <button
+                  type="button"
+                  aria-label={`Bỏ ${p.file.name}`}
+                  onClick={() => files.removePending(p.id)}
+                  className="rounded-md p-1 text-ink-3 hover:bg-subtle hover:text-ink"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </li>
+            ))}
+            {files.uploading.map((u) => (
               <li key={u.id} className="flex items-center gap-3 px-3 py-2 text-sm text-ink-3">
                 <Loader2 className="size-4 shrink-0 animate-spin text-brand" />
                 <span className="min-w-0 flex-1 truncate">{u.name}</span>
@@ -138,11 +163,18 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
         )
       )}
 
-      {canEdit && (
+      {files.canEdit && (
         <>
           <button
             type="button"
             onClick={() => input.current?.click()}
+            onPaste={(e) => {
+              const pasted = Array.from(e.clipboardData.files);
+              if (pasted.length) {
+                e.preventDefault();
+                files.add(pasted);
+              }
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setOver(true);
@@ -151,7 +183,7 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
             onDrop={(e) => {
               e.preventDefault();
               setOver(false);
-              upload(Array.from(e.dataTransfer.files));
+              files.add(Array.from(e.dataTransfer.files));
             }}
             className={cn(
               "mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong px-3 py-2.5",
@@ -160,7 +192,7 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
             )}
           >
             <Paperclip className="size-4" />
-            Chọn hoặc kéo thả file (tài liệu, PDF, Excel, zip…)
+            Chọn, kéo thả hoặc dán file (tài liệu, PDF, Excel, zip…)
           </button>
           <input
             ref={input}
@@ -168,7 +200,7 @@ export function FileAttachments({ pid, base, canEdit }: { pid: number; base: str
             multiple
             hidden
             onChange={(e) => {
-              upload(Array.from(e.target.files ?? []));
+              files.add(Array.from(e.target.files ?? []));
               e.target.value = "";
             }}
           />

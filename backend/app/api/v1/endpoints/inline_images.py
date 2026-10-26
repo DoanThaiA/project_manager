@@ -3,6 +3,9 @@
 Văn bản lưu dấu `[Ảnh: <tên file>]` mỗi dòng; tên file do client sinh ngẫu nhiên, duy nhất trong dự án.
 Ảnh gắn với dự án (entity_type = 'inline', entity_id = project_id) nên tải lên được cả khi bản ghi
 chứa văn bản chưa được tạo.
+
+File (tài liệu, PDF...) dán trong văn bản tải lên qua /inline-files (Cloudflare R2), dấu [File: <mã>/<tên file>];
+GET ở đây tra URL cho cả ảnh lẫn file theo tên.
 """
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
@@ -21,7 +24,7 @@ router = APIRouter()
 ENTITY = "inline"
 
 
-@router.get("", response_model=list[AttachmentOut], summary="Lấy URL các ảnh dán trong văn bản theo tên file")
+@router.get("", response_model=list[AttachmentOut], summary="Lấy URL các ảnh / file dán trong văn bản theo tên file")
 async def resolve_inline_images(
     names: list[str] = Query(..., max_length=200),
     ctx: ProjectContext = Depends(require_project_permission("project.view")),

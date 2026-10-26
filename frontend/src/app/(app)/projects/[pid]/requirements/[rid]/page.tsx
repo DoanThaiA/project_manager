@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { ActivityFeed } from "@/components/activity-feed";
 import { useProjectActivityResolver } from "@/lib/activity-resolver";
-import { FileAttachments } from "@/components/project/file-attachments";
+import { FileAttachments, useFileAttachments } from "@/components/project/file-attachments";
 import { ImageTextEditor } from "@/components/project/image-text-editor";
 import { RequirementFormModal } from "@/components/project/requirement-form";
 import { WorkItemModal } from "@/components/project/work-item-modal";
@@ -20,6 +20,7 @@ import { Card, CardHeader, Empty, ProgressBar, Spinner, UserChip } from "@/compo
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, errorMessage } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useMembers, useProjectId, useProjectPerms } from "@/lib/hooks";
 import {
   APPROVAL_STATUSES,
@@ -58,7 +59,7 @@ function StatusChangeModal({
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const rejecting = target === "rejected";
-  const images = useInlineImages(pid, [note]);
+  const images = useInlineImages(pid, [note], "requirement-status");
   const mutation = useMutation({
     mutationFn: () =>
       api.post(`/projects/${pid}/requirements/${req.id}/status`, {
@@ -128,7 +129,7 @@ function Comments({ pid, rid }: { pid: number; rid: number }) {
   const { can } = useProjectPerms(pid);
   const [content, setContent] = useState("");
   const [internal, setInternal] = useState(false);
-  const images = useInlineImages(pid, [content]);
+  const images = useInlineImages(pid, [content], "requirement-comments");
   const canSend = !!content.trim() && images.uploading === 0;
   const key = ["project", pid, "requirements", rid, "comments"];
   const comments = useQuery({
@@ -285,6 +286,7 @@ export default function RequirementDetailPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const toast = useToast();
+  const { me } = useAuth();
   const { can } = useProjectPerms(pid);
   const { byId } = useMembers(pid);
   const [editing, setEditing] = useState(false);
@@ -295,6 +297,12 @@ export default function RequirementDetailPage() {
   const req = useQuery({
     queryKey: ["project", pid, "requirements", rid],
     queryFn: async () => (await api.get<RequirementDetail>(`/projects/${pid}/requirements/${rid}`)).data,
+  });
+  // Người tạo yêu cầu (vd khách hàng) cũng gắn / xoá được file của yêu cầu mình
+  const files = useFileAttachments({
+    pid,
+    base: `/projects/${pid}/requirements/${rid}`,
+    canEdit: can("requirement.update") || (!!me && req.data?.created_by === me.id),
   });
   const items = useQuery({
     queryKey: ["project", pid, "work-items", { requirement_id: rid }],
@@ -364,11 +372,7 @@ export default function RequirementDetailPage() {
           <Card>
             <CardHeader title="Tài liệu đính kèm" />
             <div className="p-4">
-              <FileAttachments
-                pid={pid}
-                base={`/projects/${pid}/requirements/${rid}`}
-                canEdit={can("requirement.update")}
-              />
+              <FileAttachments files={files} />
             </div>
           </Card>
 

@@ -100,7 +100,7 @@ export function CompleteSprintModal({
   const [target, setTarget] = useState<string>("backlog");
   const [review, setReview] = useState(sprint.review_note ?? "");
   const [retro, setRetro] = useState(sprint.retrospective_note ?? "");
-  const images = useInlineImages(pid, [review, retro]);
+  const images = useInlineImages(pid, [review, retro], "sprints");
 
   const mutation = useMutation({
     mutationFn: () =>

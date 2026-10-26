@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { FileAttachments, useFileAttachments } from "@/components/project/file-attachments";
 import { ImageTextEditor } from "@/components/project/image-text-editor";
 import { EnumSelect, MemberSelect } from "@/components/project/selects";
 import { PASTE_HINT, useInlineImages } from "@/components/text-images";
@@ -70,7 +71,9 @@ export function RequirementFormModal({
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const editing = !!requirement;
   const canAssign = can("requirement.assign");
-  const images = useInlineImages(pid, [form.description, form.acceptance_criteria]);
+  const images = useInlineImages(pid, [form.description, form.acceptance_criteria], "requirements");
+  // Tạo mới: file chọn trước, tải lên sau khi có yêu cầu. Sửa: quản lý file ở trang chi tiết yêu cầu.
+  const files = useFileAttachments({ pid, canEdit: !editing });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -92,10 +95,12 @@ export function RequirementFormModal({
           .filter(Boolean),
         ...(canAssign ? { assignee_id: form.assignee_id } : {}),
       };
-      const res = editing
-        ? await api.patch<Requirement>(`/projects/${pid}/requirements/${requirement.id}`, body)
-        : await api.post<Requirement>(`/projects/${pid}/requirements`, body);
-      return res.data;
+      if (editing) return (await api.patch<Requirement>(`/projects/${pid}/requirements/${requirement.id}`, body)).data;
+      const created = (await api.post<Requirement>(`/projects/${pid}/requirements`, body)).data;
+      // Lỗi tải file không làm hỏng việc tạo yêu cầu
+      const failed = await files.uploadPending(`/projects/${pid}/requirements/${created.id}`);
+      if (failed) toast.error(`${created.code}: ${failed} file tải lên lỗi — mở yêu cầu để thử lại`);
+      return created;
     },
     onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ["project", pid, "requirements"] });
@@ -217,6 +222,12 @@ export function RequirementFormModal({
         <Field label="Tag" hint="Cách nhau bởi dấu phẩy">
           {(id) => <Input id={id} value={form.tags} onChange={(e) => set("tags", e.target.value)} />}
         </Field>
+        {!editing && (
+          <div className="sm:col-span-2">
+            <p className="mb-1.5 text-[13px] font-medium text-ink-2">Tài liệu đính kèm</p>
+            <FileAttachments files={files} />
+          </div>
+        )}
         <button type="submit" hidden />
       </form>
     </Modal>

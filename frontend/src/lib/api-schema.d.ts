@@ -751,7 +751,7 @@ export interface paths {
         /** File đính kèm */
         get: operations["list_files_api_v1_projects__project_id__requirements__entity_id__files_get"];
         put?: never;
-        /** Tải file đính kèm lên MinIO */
+        /** Tải file đính kèm lên Cloudflare R2 */
         post: operations["upload_file_api_v1_projects__project_id__requirements__entity_id__files_post"];
         delete?: never;
         options?: never;
@@ -858,7 +858,7 @@ export interface paths {
         /** File đính kèm */
         get: operations["list_files_api_v1_projects__project_id__work_items__entity_id__files_get"];
         put?: never;
-        /** Tải file đính kèm lên MinIO */
+        /** Tải file đính kèm lên Cloudflare R2 */
         post: operations["upload_file_api_v1_projects__project_id__work_items__entity_id__files_post"];
         delete?: never;
         options?: never;
@@ -890,11 +890,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lấy URL các ảnh dán trong văn bản theo tên file */
+        /** Lấy URL các ảnh / file dán trong văn bản theo tên file */
         get: operations["resolve_inline_images_api_v1_projects__project_id__inline_images_get"];
         put?: never;
         /** Tải ảnh dán trong văn bản lên Cloudflare Images */
         post: operations["upload_inline_image_api_v1_projects__project_id__inline_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/inline-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tải file dán trong văn bản lên Cloudflare R2 */
+        post: operations["upload_inline_file_api_v1_projects__project_id__inline_files_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1206,6 +1223,21 @@ export interface components {
         Body_upload_file_api_v1_projects__project_id__work_items__entity_id__files_post: {
             /** File */
             file: string;
+        };
+        /** Body_upload_inline_file_api_v1_projects__project_id__inline_files_post */
+        Body_upload_inline_file_api_v1_projects__project_id__inline_files_post: {
+            /** File */
+            file: string;
+            /**
+             * Name
+             * @description '<mã 16 hex>/<tên file>' — trùng với dấu [File: ...] trong văn bản
+             */
+            name: string;
+            /**
+             * @description Ô văn bản nào — mỗi nhóm một folder trên R2
+             * @default other
+             */
+            folder: components["schemas"]["TextFileFolder"];
         };
         /** Body_upload_inline_image_api_v1_projects__project_id__inline_images_post */
         Body_upload_inline_image_api_v1_projects__project_id__inline_images_post: {
@@ -2237,6 +2269,12 @@ export interface components {
              */
             expires_at: string;
         };
+        /**
+         * TextFileFolder
+         * @description Nhóm (folder trên R2) của file gắn trong ô văn bản: projects/<id>/text/<nhóm>/...
+         * @enum {string}
+         */
+        TextFileFolder: "work-items" | "requirements" | "requirement-comments" | "requirement-status" | "work-logs" | "sprints" | "other";
         /** Token */
         Token: {
             /** Access Token */
@@ -5232,6 +5270,41 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_upload_inline_image_api_v1_projects__project_id__inline_images_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_inline_file_api_v1_projects__project_id__inline_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_inline_file_api_v1_projects__project_id__inline_files_post"];
             };
         };
         responses: {

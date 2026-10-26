@@ -30,15 +30,13 @@ class Settings(BaseSettings):
     cf_images_url_expire_seconds: int = 60 * 60
     attachment_max_mb: int = 10
 
-    # MinIO (S3) lưu file đính kèm (tài liệu, PDF, Excel, zip...) của công việc và yêu cầu; bucket phải có sẵn
-    minio_endpoint: str = ""  # host:port API gọi tới, vd minio.example.com hoặc minio:9000
-    # host:port trình duyệt tải file (URL ký sẵn ghi host này); bỏ trống = minio_endpoint
-    minio_public_endpoint: str = ""
-    minio_secure: bool = True  # https
-    minio_access_key: str = ""
-    minio_secret_key: str = ""
-    minio_bucket: str = "project-manager"
-    minio_region: str = "us-east-1"  # đặt sẵn để ký URL không phải hỏi server
+    # Cloudflare R2 lưu file đính kèm (tài liệu, PDF, Excel, zip...); bucket phải có sẵn, để private
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""  # R2 › Manage API tokens › quyền "Object Read & Write" trên bucket
+    r2_secret_access_key: str = ""
+    r2_bucket: str = "project-manager"
+    # Bỏ trống = <account_id>.r2.cloudflarestorage.com; bucket ở EU: <account_id>.eu.r2.cloudflarestorage.com
+    r2_endpoint: str = ""
     file_max_mb: int = 50
     file_url_expire_seconds: int = 60 * 60
 

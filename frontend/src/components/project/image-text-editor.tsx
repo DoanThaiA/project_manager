@@ -14,10 +14,16 @@ import {
   type ReactNodeViewProps,
   useEditor,
 } from "@tiptap/react";
-import { ImageOff, ImagePlus, Loader2, ZoomIn } from "lucide-react";
+import { Download, ImageOff, ImagePlus, Loader2, Paperclip, ZoomIn } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 
-import { IMAGE_ACCEPT, ImageViewerModal, type TextImage, type TextImageSource } from "@/components/text-images";
+import {
+  FileChip,
+  IMAGE_ACCEPT,
+  ImageViewerModal,
+  type TextImage,
+  type TextImageSource,
+} from "@/components/text-images";
 import { cn } from "@/lib/utils";
 
 // Node view render qua portal bên trong EditorContent nên đọc được context này
@@ -85,12 +91,54 @@ const InlineImage = Node.create({
   addNodeView: () => ReactNodeViewRenderer(ImageView),
 });
 
-/** Văn bản thuần (mỗi dòng một đoạn, dòng dấu ảnh thành ảnh) -> nội dung editor. */
-function toDoc(text: string, isMarker: (line: string) => boolean) {
+function FileView({ node, editor }: ReactNodeViewProps) {
+  const ctx = useContext(ImagesContext);
+  const marker = node.attrs.marker as string;
+  const file = ctx?.source.files?.find(marker);
+  if (!editor.isEditable || !file?.url) {
+    return (
+      <NodeViewWrapper className="my-1" data-drag-handle>
+        <FileChip file={file} missing={marker} />
+      </NodeViewWrapper>
+    );
+  }
+  // Đang soạn: bấm để chọn file (xoá / kéo thả), nút tải riêng bên cạnh
+  return (
+    <NodeViewWrapper className="my-1" data-drag-handle>
+      <span className="inline-flex max-w-full items-center gap-1">
+        <FileChip file={{ ...file, url: undefined }} />
+        <a
+          href={file.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Tải ${file.name}`}
+          className="rounded-md p-1 text-ink-3 hover:bg-subtle hover:text-brand"
+        >
+          <Download className="size-3.5" />
+        </a>
+      </span>
+    </NodeViewWrapper>
+  );
+}
+
+/** File trong văn bản: khối riêng, lưu xuống thành một dòng dấu file (vd: [File: mã/tên file]). */
+const InlineFile = Node.create({
+  name: "textFile",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes: () => ({ marker: { default: "" } }),
+  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes(HTMLAttributes, { "data-text-file": "" })],
+  addNodeView: () => ReactNodeViewRenderer(FileView),
+});
+
+/** Văn bản thuần (mỗi dòng một đoạn, dòng dấu ảnh / file thành ảnh / file) -> nội dung editor. */
+function toDoc(text: string, source: TextImageSource) {
   return {
     type: "doc",
     content: text.split("\n").map((line) => {
-      if (isMarker(line)) return { type: InlineImage.name, attrs: { marker: line } };
+      if (source.isMarker(line)) return { type: InlineImage.name, attrs: { marker: line } };
+      if (source.files?.isMarker(line)) return { type: InlineFile.name, attrs: { marker: line } };
       return {
         type: "paragraph",
         content: line ? [{ type: "text", text: line }] : [],
@@ -101,14 +149,18 @@ function toDoc(text: string, isMarker: (line: string) => boolean) {
 
 function toText(doc: PMNode): string {
   const lines: string[] = [];
-  doc.forEach((node) => lines.push(node.type.name === InlineImage.name ? node.attrs.marker : node.textContent));
+  const markers = new Set([InlineImage.name, InlineFile.name]);
+  doc.forEach((node) => lines.push(markers.has(node.type.name) ? node.attrs.marker : node.textContent));
   return lines.join("\n");
 }
 
-/** Chỉ lấy ảnh khi clipboard / file kéo vào chỉ có ảnh; có kèm chữ (copy từ Word, web...) thì dán chữ. */
-function imageFiles(data: DataTransfer | null): File[] {
-  if (!data || data.getData("text/plain")) return [];
-  return Array.from(data.files).filter((f) => f.type.startsWith("image/"));
+/**
+ * Tách file trong clipboard / kéo vào thành ảnh và file khác. Có kèm chữ (copy từ Word, web...) thì dán chữ.
+ */
+function droppedFiles(data: DataTransfer | null): { images: File[]; others: File[] } {
+  if (!data || data.getData("text/plain")) return { images: [], others: [] };
+  const all = Array.from(data.files);
+  return { images: all.filter((f) => f.type.startsWith("image/")), others: all.filter((f) => !f.type.startsWith("image/")) };
 }
 
 /**
@@ -147,15 +199,17 @@ export function ImageTextEditor({
 
   const editorRef = useRef<Editor | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const attachInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<TextImage | null>(null);
 
-  /** Thêm ảnh qua `source` và chèn vào văn bản tại `pos` (mặc định: con trỏ). */
-  const insertImages = (files: File[], pos?: number) => {
-    const markers = latest.current.source.add(files);
+  /** Thêm ảnh / file qua `source` và chèn vào văn bản tại `pos` (mặc định: con trỏ). */
+  const insertImages = (files: File[], pos?: number, kind: "image" | "file" = "image") => {
+    const { source } = latest.current;
+    const markers = kind === "image" ? source.add(files) : (source.files?.add(files) ?? []);
     const editor = editorRef.current;
     if (!markers.length || !editor) return;
     const content = markers.map((marker) => ({
-      type: InlineImage.name,
+      type: kind === "image" ? InlineImage.name : InlineFile.name,
       attrs: { marker },
     }));
     const chain = editor.chain().focus();
@@ -181,9 +235,10 @@ export function ImageTextEditor({
       Dropcursor,
       Gapcursor,
       InlineImage,
+      InlineFile,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
     ],
-    content: toDoc(value, source.isMarker),
+    content: toDoc(value, source),
     editorProps: {
       attributes: {
         ...(id ? { id } : {}),
@@ -200,19 +255,23 @@ export function ImageTextEditor({
         return true;
       },
       handlePaste: (view, event) => {
-        const files = imageFiles(event.clipboardData);
-        if (!view.editable || !files.length) return false;
-        insertImages(files);
+        const { images, others } = droppedFiles(event.clipboardData);
+        const files = latest.current.source.files ? others : [];
+        if (!view.editable || (!images.length && !files.length)) return false;
+        if (images.length) insertImages(images);
+        if (files.length) insertImages(files, undefined, "file");
         return true;
       },
       handleDrop: (view, event, _slice, moved) => {
-        const files = moved ? [] : imageFiles(event.dataTransfer);
-        if (!view.editable || !files.length) return false;
+        const { images, others } = moved ? { images: [], others: [] } : droppedFiles(event.dataTransfer);
+        const files = latest.current.source.files ? others : [];
+        if (!view.editable || (!images.length && !files.length)) return false;
         const pos = view.posAtCoords({
           left: event.clientX,
           top: event.clientY,
         })?.pos;
-        insertImages(files, pos);
+        if (images.length) insertImages(images, pos);
+        if (files.length) insertImages(files, images.length ? undefined : pos, "file");
         return true;
       },
     },
@@ -226,7 +285,7 @@ export function ImageTextEditor({
   // Giá trị đổi từ bên ngoài (vd: xoá ảnh ở khu Hình ảnh -> bỏ dấu) thì nạp lại nội dung
   useEffect(() => {
     if (editor && toText(editor.state.doc) !== value) {
-      editor.commands.setContent(toDoc(value, latest.current.source.isMarker), {
+      editor.commands.setContent(toDoc(value, latest.current.source), {
         emitUpdate: false,
       });
     }
@@ -279,6 +338,27 @@ export function ImageTextEditor({
                 e.target.value = "";
               }}
             />
+            {source.files && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => attachInput.current?.click()}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-ink-3 transition-colors hover:bg-subtle hover:text-brand"
+                >
+                  <Paperclip className="size-3.5" /> Gắn file
+                </button>
+                <input
+                  ref={attachInput}
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    insertImages(Array.from(e.target.files ?? []), undefined, "file");
+                    e.target.value = "";
+                  }}
+                />
+              </>
+            )}
           </div>
         )}
       </div>

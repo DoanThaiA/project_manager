@@ -18,13 +18,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ENTITY = "work_item"
-IMAGE = Attachment.storage == "cloudflare"  # file trên MinIO có endpoint riêng (files.py)
+IMAGE = Attachment.storage == "cloudflare"  # file trên R2 có endpoint riêng (files.py)
 
 
 def attachment_out(att: Attachment) -> AttachmentOut:
     fields = {name: getattr(att, name) for name in AttachmentOut.model_fields if name != "url"}
-    if att.storage == "minio":
-        url = file_storage.download_url(att.storage_key, att.file_name)
+    if att.storage == file_storage.STORAGE:
+        # File dán trong văn bản: file_name = '<mã>/<tên file>' -> tải về với tên file gốc
+        url = file_storage.download_url(att.storage_key, att.file_name.split("/", 1)[-1])
     else:
         url = storage.image_url(att.storage_key)
     return AttachmentOut(**fields, url=url)
@@ -109,7 +110,7 @@ async def delete_attachment(
         or att.project_id != ctx.project.id
         or att.entity_type != ENTITY
         or att.entity_id != item_id
-        or att.storage == "minio"
+        or att.storage == file_storage.STORAGE
     ):
         raise not_found("ảnh đính kèm")
     image_id = att.storage_key

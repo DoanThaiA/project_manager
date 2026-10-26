@@ -10,7 +10,7 @@ class Attachment(Base):
     """File đính kèm dùng chung (entity_type + entity_id).
 
     storage = 'cloudflare': ảnh trên Cloudflare Images (storage_key = image id);
-    storage = 'minio': file trên MinIO (storage_key = object key).
+    storage = 'r2': file trên Cloudflare R2 (storage_key = object key).
     """
 
     __tablename__ = "attachments"

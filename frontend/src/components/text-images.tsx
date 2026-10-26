@@ -1,32 +1,87 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ImageIcon, ImageOff, Loader2 } from "lucide-react";
+import {
+  File as GenericFile,
+  FileArchive,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  FileX,
+  ImageIcon,
+  ImageOff,
+  Loader2,
+  Paperclip,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
-import type { Attachment } from "@/lib/types";
+import type { Attachment, TextFileFolder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const IMAGE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
 const MAX_MB = 10;
 
-export const PASTE_HINT = "Dán ảnh (Ctrl+V), kéo thả hoặc bấm \"Gắn ảnh\"; bấm đúp vào ảnh để phóng to";
+export const FILE_MAX_MB = 50;
+
+export const PASTE_HINT =
+  "Dán ảnh / file (Ctrl+V), kéo thả hoặc bấm \"Gắn ảnh\" / \"Gắn file\"; bấm đúp vào ảnh để phóng to";
 
 /** Ảnh hiển thị trong ô văn bản / khung xem ảnh. */
 export type TextImage = { src: string; name: string; uploading?: boolean };
 
+/** File (tài liệu, PDF, Excel...) trong ô văn bản; `name` là tên hiển thị (tên file gốc). */
+export type TextFile = { name: string; url?: string; size?: number | null; uploading?: boolean };
+
 /**
  * Nguồn ảnh cho ô văn bản có ảnh: văn bản lưu mỗi ảnh thành một dòng dấu (vd: [Ảnh: tên file]),
  * nguồn ảnh biết dấu nào là ảnh, thêm ảnh mới (trả về các dấu để chèn) và tra ảnh theo dấu.
+ * `files`: tương tự cho file (dấu [File: ...]); không có thì ô soạn không cho gắn file.
  */
 export type TextImageSource = {
   isMarker: (line: string) => boolean;
   add: (files: File[]) => string[];
   find: (marker: string) => TextImage | undefined;
+  files?: {
+    isMarker: (line: string) => boolean;
+    add: (files: File[]) => string[];
+    find: (marker: string) => TextFile | undefined;
+  };
 };
+
+export function fmtBytes(n?: number | null) {
+  if (n == null) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export function FileTypeIcon({ name, className }: { name: string; className?: string }) {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const Icon = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "heic"].includes(ext)
+    ? FileImage
+    : ["xls", "xlsx", "csv", "ods"].includes(ext)
+      ? FileSpreadsheet
+      : ["zip", "rar", "7z", "gz", "tar"].includes(ext)
+        ? FileArchive
+        : ["pdf", "doc", "docx", "txt", "md", "odt", "ppt", "pptx", "rtf"].includes(ext)
+          ? FileText
+          : GenericFile;
+  return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} />;
+}
+
+/** Lọc file đính kèm hợp lệ (không rỗng, không quá FILE_MAX_MB). */
+export function pickFiles(files: Iterable<File>, onReject: (msg: string) => void): File[] {
+  const ok: File[] = [];
+  for (const f of files) {
+    if (f.size === 0) onReject(`${f.name}: file rỗng`);
+    else if (f.size > FILE_MAX_MB * 1024 * 1024) onReject(`${f.name}: vượt quá ${FILE_MAX_MB} MB`);
+    else ok.push(f);
+  }
+  return ok;
+}
 
 /** Lọc file ảnh hợp lệ; ảnh dán từ clipboard thường tên "image.png" nên đặt lại tên theo thời gian. */
 export function pickImages(files: Iterable<File>, onReject: (msg: string) => void): File[] {
@@ -64,17 +119,33 @@ export function ImageViewerModal({ image, onClose }: { image: TextImage; onClose
 // ---------------------------------------------------------------------------
 
 const INLINE_RE = /^\[Ảnh: ([^\]]+)\]$/;
-// Mọi loại dấu ảnh, kể cả [Ảnh lỗi: ...] / [Ảnh sau khi sửa: ...] của công việc
-const ANY_MARKER_RE = /^\[Ảnh[^:\]]*: [^\]]+\]$/;
+// File dán trong văn bản: [File: <mã 16 hex>/<tên file gốc>] (lưu trên Cloudflare R2)
+const FILE_RE = /^\[File: ([0-9a-f]{16}\/[^\]]+)\]$/;
+// Mọi loại dấu ảnh / file, kể cả [Ảnh lỗi: ...] / [Ảnh sau khi sửa: ...] của công việc
+const ANY_MARKER_RE = /^\[(Ảnh[^:\]]*|File): [^\]]+\]$/;
 
 export const inlineMarker = (name: string) => `[Ảnh: ${name}]`;
 const inlineName = (line: string) => INLINE_RE.exec(line)?.[1];
+export const fileMarker = (name: string) => `[File: ${name}]`;
+const inlineFileName = (line: string) => FILE_RE.exec(line)?.[1];
+/** Tên hiển thị của file dán trong văn bản (bỏ mã ở đầu). */
+export const fileDisplayName = (name: string) => name.slice(name.indexOf("/") + 1);
 
 /** Tên các ảnh dán trong văn bản. */
 export const inlineImageNames = (text: string | null | undefined) =>
   (text ?? "").split("\n").flatMap((line) => inlineName(line) ?? []);
 
-/** Văn bản bỏ các dòng dấu ảnh — để hiện tóm tắt một dòng trong danh sách. */
+/** Tên các file dán trong văn bản. */
+export const inlineFileNames = (text: string | null | undefined) =>
+  (text ?? "").split("\n").flatMap((line) => inlineFileName(line) ?? []);
+
+/** Tên lưu cho file dán trong văn bản: mã ngẫu nhiên + tên gốc (bỏ ký tự làm hỏng dấu [File: ...]). */
+function inlineFileRef(file: File) {
+  const clean = file.name.replace(/[/\\\]\r\n]/g, "_").trim().slice(0, 200) || "file";
+  return `${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}/${clean}`;
+}
+
+/** Văn bản bỏ các dòng dấu ảnh / file — để hiện tóm tắt một dòng trong danh sách. */
 export const withoutImages = (text: string | null | undefined) =>
   (text ?? "")
     .split("\n")
@@ -84,7 +155,10 @@ export const withoutImages = (text: string | null | undefined) =>
 
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 
-/** URL các ảnh theo tên file (URL có thể là URL ký tạm nên luôn hỏi lại máy chủ, không lưu vào văn bản). */
+/**
+ * Ảnh / file dán trong văn bản theo tên (URL là URL ký tạm nên luôn hỏi lại máy chủ, không lưu vào văn bản).
+ * Kết quả: tên -> bản ghi đính kèm (url, dung lượng...).
+ */
 function useResolvedImages(pid: number | null | undefined, names: string[], enabled = true) {
   const sorted = useMemo(() => [...new Set(names)].sort(), [names]);
   return useQuery({
@@ -92,25 +166,36 @@ function useResolvedImages(pid: number | null | undefined, names: string[], enab
     queryFn: async () =>
       (await api.get<Attachment[]>(`/projects/${pid}/inline-images`, { params: { names: sorted } })).data,
     enabled: enabled && !!pid && sorted.length > 0,
-    select: (list) => new Map(list.map((a) => [a.file_name, a.url])),
+    select: (list) => new Map(list.map((a) => [a.file_name, a])),
     placeholderData: keepPreviousData,
+    // URL ký tạm hết hạn sau 1 giờ
     staleTime: 10 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000,
   });
 }
 
 type Local = { preview: string; url?: string; uploading: boolean };
+type LocalFile = { size: number; url?: string; uploading: boolean };
 
 /**
- * Ảnh dán trong các ô văn bản của một form. `texts`: giá trị hiện tại của các ô (để tra URL ảnh đã lưu).
- * Ảnh tải lên ngay khi dán; `uploading` > 0 thì chưa nên lưu form.
+ * Ảnh / file dán trong các ô văn bản của một form. `texts`: giá trị hiện tại của các ô (để tra URL đã lưu).
+ * Ảnh (Cloudflare Images) và file (Cloudflare R2) tải lên ngay khi dán; `uploading` > 0 thì chưa nên lưu form.
+ * `folder`: ô văn bản thuộc chỗ nào — file lưu vào folder riêng của chỗ đó trên R2 (projects/<id>/text/<folder>/).
  */
-export function useInlineImages(pid: number | null | undefined, texts: string[]) {
+export function useInlineImages(pid: number | null | undefined, texts: string[], folder: TextFileFolder) {
   const toast = useToast();
   const [local, setLocal] = useState<Record<string, Local>>({});
+  const [localFiles, setLocalFiles] = useState<Record<string, LocalFile>>({});
 
-  // Chỉ hỏi máy chủ các ảnh đã lưu từ trước; ảnh vừa dán đã có URL từ kết quả tải lên
+  // Chỉ hỏi máy chủ những gì đã lưu từ trước; ảnh / file vừa dán đã có URL từ kết quả tải lên
   const joined = texts.join("\n");
-  const saved = useMemo(() => inlineImageNames(joined).filter((n) => !(n in local)), [joined, local]);
+  const saved = useMemo(
+    () => [
+      ...inlineImageNames(joined).filter((n) => !(n in local)),
+      ...inlineFileNames(joined).filter((n) => !(n in localFiles)),
+    ],
+    [joined, local, localFiles],
+  );
   const resolved = useResolvedImages(pid, saved);
 
   const previews = useRef(new Set<string>());
@@ -119,13 +204,15 @@ export function useInlineImages(pid: number | null | undefined, texts: string[])
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, []);
 
+  const needProject = () => {
+    if (!pid) toast.error("Chọn dự án trước khi gắn ảnh / file");
+    return !pid;
+  };
+
   const source: TextImageSource = {
     isMarker: (line) => INLINE_RE.test(line),
     add: (files) => {
-      if (!pid) {
-        toast.error("Chọn dự án trước khi dán ảnh");
-        return [];
-      }
+      if (needProject()) return [];
       return pickImages(files, toast.error).map((file) => {
         const name = `${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}.${EXT[file.type]}`;
         const preview = URL.createObjectURL(file);
@@ -149,25 +236,111 @@ export function useInlineImages(pid: number | null | undefined, texts: string[])
       if (!name) return undefined;
       const l = local[name];
       if (l) return { name, src: l.url ?? l.preview, uploading: l.uploading };
-      const url = resolved.data?.get(name);
+      const url = resolved.data?.get(name)?.url;
       return url ? { name, src: url } : undefined;
+    },
+    files: {
+      isMarker: (line) => FILE_RE.test(line),
+      add: (files) => {
+        if (needProject()) return [];
+        return pickFiles(files, toast.error).map((file) => {
+          const name = inlineFileRef(file);
+          setLocalFiles((m) => ({ ...m, [name]: { size: file.size, uploading: true } }));
+          const body = new FormData();
+          body.append("file", file);
+          body.append("name", name);
+          body.append("folder", folder);
+          api
+            .post<Attachment>(`/projects/${pid}/inline-files`, body)
+            .then((res) =>
+              setLocalFiles((m) => ({ ...m, [name]: { size: file.size, url: res.data.url, uploading: false } })),
+            )
+            .catch((err) => {
+              toast.error(err);
+              setLocalFiles((m) => Object.fromEntries(Object.entries(m).filter(([n]) => n !== name)));
+            });
+          return fileMarker(name);
+        });
+      },
+      find: (marker) => {
+        const name = inlineFileName(marker);
+        if (!name) return undefined;
+        const l = localFiles[name];
+        if (l) return { name: fileDisplayName(name), url: l.url, size: l.size, uploading: l.uploading };
+        const a = resolved.data?.get(name);
+        return a ? { name: fileDisplayName(name), url: a.url, size: a.size_bytes } : undefined;
+      },
     },
   };
 
-  const uploading = Object.values(local).filter((l) => l.uploading).length;
+  const uploading = [...Object.values(local), ...Object.values(localFiles)].filter((l) => l.uploading).length;
   return { source, uploading };
 }
 
-/** Hiển thị văn bản có ảnh dán (chỉ đọc); bấm vào ảnh để xem cỡ lớn. */
+/** Một file trong văn bản: biểu tượng, tên, dung lượng; bấm để tải về. */
+export function FileChip({ file, missing, className }: { file?: TextFile; missing?: string; className?: string }) {
+  const chip = cn(
+    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-1 text-[13px]",
+    className,
+  );
+  if (!file)
+    return (
+      <span className={cn(chip, "border-dashed text-ink-3")}>
+        <FileX className="size-4 shrink-0" /> <span className="truncate">{missing ?? "Không tìm thấy file"}</span>
+      </span>
+    );
+  const body = (
+    <>
+      {file.uploading ? (
+        <Loader2 className="size-4 shrink-0 animate-spin text-brand" />
+      ) : (
+        <FileTypeIcon name={file.name} />
+      )}
+      <span className="truncate font-medium">{file.name}</span>
+      {file.size != null && <span className="shrink-0 text-xs text-ink-3">{fmtBytes(file.size)}</span>}
+    </>
+  );
+  return file.url && !file.uploading ? (
+    <a
+      href={file.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Tải ${file.name}`}
+      className={cn(chip, "text-ink hover:border-brand hover:text-brand")}
+    >
+      {body}
+    </a>
+  ) : (
+    <span className={chip}>{body}</span>
+  );
+}
+
+/** Hiển thị văn bản có ảnh / file dán (chỉ đọc); bấm vào ảnh để xem cỡ lớn, bấm file để tải về. */
 export function RichText({ pid, text, className }: { pid: number; text: string; className?: string }) {
-  const resolved = useResolvedImages(pid, inlineImageNames(text));
+  const resolved = useResolvedImages(pid, [...inlineImageNames(text), ...inlineFileNames(text)]);
   const [viewing, setViewing] = useState<TextImage | null>(null);
   return (
     <div className={cn("whitespace-pre-line", className)}>
       {text.split("\n").map((line, i) => {
+        const fileName = inlineFileName(line);
+        if (fileName) {
+          const a = resolved.data?.get(fileName);
+          const display = fileDisplayName(fileName);
+          return (
+            <div key={i} className="my-1">
+              {a ? (
+                <FileChip file={{ name: display, url: a.url, size: a.size_bytes }} />
+              ) : resolved.isPending ? (
+                <FileChip file={{ name: display, uploading: true }} />
+              ) : (
+                <FileChip missing={display} />
+              )}
+            </div>
+          );
+        }
         const name = inlineName(line);
         if (!name) return <p key={i}>{line || " "}</p>;
-        const src = resolved.data?.get(name);
+        const src = resolved.data?.get(name)?.url;
         return (
           <div key={i} className="my-1.5">
             {src ? (
@@ -191,26 +364,70 @@ export function RichText({ pid, text, className }: { pid: number; text: string; 
   );
 }
 
-/** Nút nhỏ "n ảnh" cạnh tóm tắt văn bản trong danh sách; bấm để xem các ảnh. */
+/** Nút nhỏ "n ảnh" / "n file" cạnh tóm tắt văn bản trong danh sách; bấm để xem ảnh / tải file. */
 export function TextImagesButton({ pid, text }: { pid: number; text: string | null | undefined }) {
   const names = inlineImageNames(text);
-  const [open, setOpen] = useState(false);
-  if (!names.length) return null;
+  const files = inlineFileNames(text);
+  const [open, setOpen] = useState<"images" | "files" | null>(null);
+  if (!names.length && !files.length) return null;
+  const button = "inline-flex shrink-0 items-center gap-1 rounded-md px-1 text-xs text-brand hover:bg-brand-soft";
   return (
     <>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md px-1 text-xs text-brand hover:bg-brand-soft"
-        title="Xem ảnh"
-      >
-        <ImageIcon className="size-3.5" /> {names.length}
-      </button>
-      {open && <ImageGalleryModal pid={pid} names={names} onClose={() => setOpen(false)} />}
+      {names.length > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen("images");
+          }}
+          className={button}
+          title="Xem ảnh"
+        >
+          <ImageIcon className="size-3.5" /> {names.length}
+        </button>
+      )}
+      {files.length > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen("files");
+          }}
+          className={button}
+          title="Xem file đính kèm"
+        >
+          <Paperclip className="size-3.5" /> {files.length}
+        </button>
+      )}
+      {open === "images" && <ImageGalleryModal pid={pid} names={names} onClose={() => setOpen(null)} />}
+      {open === "files" && <FilesModal pid={pid} names={files} onClose={() => setOpen(null)} />}
     </>
+  );
+}
+
+function FilesModal({ pid, names, onClose }: { pid: number; names: string[]; onClose: () => void }) {
+  const resolved = useResolvedImages(pid, names);
+  return (
+    <Modal open size="sm" title={`File đính kèm (${names.length})`} onClose={onClose}>
+      <ul className="space-y-2">
+        {names.map((n) => {
+          const a = resolved.data?.get(n);
+          const display = fileDisplayName(n);
+          return (
+            <li key={n}>
+              {a ? (
+                <FileChip file={{ name: display, url: a.url, size: a.size_bytes }} className="w-full" />
+              ) : (
+                <FileChip
+                  file={resolved.isPending ? { name: display, uploading: true } : undefined}
+                  missing={display}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Modal>
   );
 }
 
@@ -218,7 +435,7 @@ function ImageGalleryModal({ pid, names, onClose }: { pid: number; names: string
   const resolved = useResolvedImages(pid, names);
   const [index, setIndex] = useState(0);
   const name = names[index];
-  const src = resolved.data?.get(name);
+  const src = resolved.data?.get(name)?.url;
   return (
     <Modal open size="xl" title={`Ảnh ${index + 1}/${names.length}`} onClose={onClose}>
       <div className="grid min-h-40 place-items-center">
@@ -232,7 +449,7 @@ function ImageGalleryModal({ pid, names, onClose }: { pid: number; names: string
       {names.length > 1 && (
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           {names.map((n, i) => {
-            const thumb = resolved.data?.get(n);
+            const thumb = resolved.data?.get(n)?.url;
             return (
               <button
                 key={n}

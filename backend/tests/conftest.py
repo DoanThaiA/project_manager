@@ -90,3 +90,24 @@ async def login(client):
 async def project_id(client, login) -> int:
     resp = await client.get("/projects", params={"q": "ERP"}, headers=await login("admin"))
     return resp.json()["items"][0]["id"]
+
+
+@pytest.fixture
+def fake_r2(monkeypatch):
+    """Thay Cloudflare R2 bằng dict trong bộ nhớ."""
+    from app.services import file_storage
+
+    objects: dict[str, tuple[bytes, str]] = {}
+
+    async def upload(key, data, size, content_type):
+        content = data.read()
+        assert len(content) == size
+        objects[key] = (content, content_type)
+
+    async def delete(key):
+        objects.pop(key, None)
+
+    monkeypatch.setattr(file_storage, "upload", upload)
+    monkeypatch.setattr(file_storage, "delete", delete)
+    monkeypatch.setattr(file_storage, "download_url", lambda key, name: f"https://r2.test/bucket/{key}")
+    return objects

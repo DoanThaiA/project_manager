@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Flag, Plus, Target } from "lucide-react";
+import { CalendarClock, CornerDownRight, Flag, ListChecks, Plus, Target } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -89,6 +89,7 @@ export default function BoardPage() {
     );
 
   const all = items.data ?? [];
+  const codeById = new Map(all.map((w) => [w.id, w.code]));
   const visible = mine ? all.filter((w) => w.assignee_id === me?.id) : all;
   const planned = all.reduce((s, w) => s + num(w.story_points), 0);
   const done = all.filter((w) => w.status === "done").reduce((s, w) => s + num(w.story_points), 0);
@@ -218,12 +219,29 @@ export default function BoardPage() {
                       >
                         <span className={cn("absolute inset-y-0 left-0 w-1", PRIORITY_BAR[w.priority])} aria-hidden />
                         <button type="button" onClick={() => setOpenItem(w)} className="block w-full text-left">
+                          {w.parent_id && codeById.has(w.parent_id) && (
+                            <p className="mb-0.5 flex items-center gap-1 font-mono text-[11px] text-ink-3">
+                              <CornerDownRight className="size-3" /> {codeById.get(w.parent_id)}
+                            </p>
+                          )}
                           <p className="mb-2 line-clamp-3 text-sm font-medium hover:text-brand">{w.title}</p>
                         </button>
                         <div className="flex items-center gap-1.5">
                           <MetaBadge meta={WORK_ITEM_TYPE[w.type]} dot={false} />
                           <span className="font-mono text-[11px] text-ink-3">{w.code}</span>
                           <span className="ml-auto flex items-center gap-1.5">
+                            {w.subtask_count > 0 && (
+                              <span
+                                className={cn(
+                                  "flex items-center gap-0.5 text-[11px] tabular-nums",
+                                  w.subtask_done === w.subtask_count ? "text-emerald-600" : "text-ink-3",
+                                )}
+                                title="Subtask đã xong"
+                              >
+                                <ListChecks className="size-3.5" />
+                                {w.subtask_done}/{w.subtask_count}
+                              </span>
+                            )}
                             {w.remaining_hours != null && w.status !== "done" && (
                               <span className="text-[11px] text-ink-3 tabular-nums" title="Giờ còn lại">
                                 {fmtHours(w.remaining_hours)}

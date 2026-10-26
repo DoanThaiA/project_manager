@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ChevronDown, GripVertical, Play, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, CornerDownRight, GripVertical, ListChecks, Play, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { SprintSelect } from "@/components/project/selects";
@@ -19,6 +19,21 @@ import type { Page, Sprint, WorkItem } from "@/lib/types";
 import { cn, fmtDate, num } from "@/lib/utils";
 
 type Section = { key: string; sprint: Sprint | null; items: WorkItem[] };
+
+/** Subtask nằm ngay dưới công việc cha (nếu cha cùng khu); `nested` = hiển thị thụt vào dưới cha. */
+function nestSubtasks(sorted: WorkItem[]): { item: WorkItem; nested: boolean }[] {
+  const ids = new Set(sorted.map((w) => w.id));
+  const children = new Map<number, WorkItem[]>();
+  for (const w of sorted) {
+    if (w.parent_id && ids.has(w.parent_id)) children.set(w.parent_id, [...(children.get(w.parent_id) ?? []), w]);
+  }
+  return sorted
+    .filter((w) => !(w.parent_id && ids.has(w.parent_id)))
+    .flatMap((w) => [
+      { item: w, nested: false },
+      ...(children.get(w.id) ?? []).sort((a, b) => a.id - b.id).map((c) => ({ item: c, nested: true })),
+    ]);
+}
 
 export default function BacklogPage() {
   const pid = useProjectId();
@@ -73,6 +88,7 @@ export default function BacklogPage() {
   if (items.isPending || sprints.isPending) return <Spinner />;
 
   const all = items.data ?? [];
+  const codeById = new Map(all.map((w) => [w.id, w.code]));
   const openSprints = (sprints.data ?? [])
     .filter((s) => s.status === "active" || s.status === "planned")
     .sort((a, b) => a.sprint_no - b.sprint_no);
@@ -136,6 +152,9 @@ export default function BacklogPage() {
       <div className="space-y-4">
         {sections.map((section) => {
           const sorted = [...section.items].sort((a, b) => a.backlog_rank - b.backlog_rank || a.id - b.id);
+          const rows = nestSubtasks(sorted);
+          // Lên / xuống chỉ đổi thứ tự giữa các dòng cấp trên; subtask luôn đi theo cha
+          const top = rows.filter((r) => !r.nested).map((r) => r.item);
           const points = sorted.reduce((s, w) => s + num(w.story_points), 0);
           const isCollapsed = collapsed[section.key];
           const s = section.sprint;
@@ -201,73 +220,95 @@ export default function BacklogPage() {
                     </p>
                   ) : (
                     <ul className="divide-y divide-line">
-                      {sorted.map((w, i) => (
-                        <li
-                          key={w.id}
-                          draggable={canEdit}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData("text/work-item", String(w.id));
-                            e.dataTransfer.effectAllowed = "move";
-                          }}
-                          className="group flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-subtle/60"
-                        >
-                          {canEdit && <GripVertical className="size-4 shrink-0 cursor-grab text-ink-3/50" aria-hidden />}
-                          <MetaBadge meta={WORK_ITEM_TYPE[w.type]} dot={false} />
-                          <button
-                            type="button"
-                            onClick={() => setOpenItem(w)}
-                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      {rows.map(({ item: w, nested }) => {
+                        const i = top.indexOf(w);
+                        return (
+                          <li
+                            key={w.id}
+                            draggable={canEdit}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/work-item", String(w.id));
+                              e.dataTransfer.effectAllowed = "move";
+                            }}
+                            className={cn(
+                              "group flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-subtle/60",
+                              nested && "pl-8",
+                            )}
                           >
-                            <span className="shrink-0 font-mono text-xs text-ink-3">{w.code}</span>
-                            <span
-                              className={cn("truncate hover:text-brand", w.status === "done" && "text-ink-3 line-through")}
+                            {canEdit && <GripVertical className="size-4 shrink-0 cursor-grab text-ink-3/50" aria-hidden />}
+                            {nested && <CornerDownRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
+                            <MetaBadge meta={WORK_ITEM_TYPE[w.type]} dot={false} />
+                            <button
+                              type="button"
+                              onClick={() => setOpenItem(w)}
+                              className="flex min-w-0 flex-1 items-center gap-2 text-left"
                             >
-                              {w.title}
-                            </span>
-                          </button>
-                          <span className="hidden sm:inline-flex">
-                            <MetaBadge meta={PRIORITY[w.priority]} dot={false} />
-                          </span>
-                          {s && <MetaBadge meta={WORK_ITEM_STATUS[w.status]} />}
-                          <Badge className="w-12 justify-center tabular-nums">{w.story_points != null ? num(w.story_points) : "–"}</Badge>
-                          <Avatar
-                            size="sm"
-                            id={w.assignee_id}
-                            name={w.assignee_id ? byId.get(w.assignee_id)?.full_name : null}
-                          />
-                          {canEdit && (
-                            <>
-                              <SprintSelect
-                                aria-label={`Chuyển ${w.code} sang sprint`}
-                                className="hidden h-7 w-48 text-xs md:block"
-                                pid={pid}
-                                value={w.sprint_id}
-                                onChange={(v) =>
-                                  patch.mutate({
-                                    id: w.id,
-                                    body: { sprint_id: v, ...(v === null ? { status: "backlog" } : {}) },
-                                  })
-                                }
-                              />
-                              {!s && (
-                                <span className="flex opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                                  <IconButton label="Lên" className="size-7" disabled={i === 0} onClick={() => move(sorted, i, -1)}>
-                                    <ArrowUp className="size-3.5" />
-                                  </IconButton>
-                                  <IconButton
-                                    label="Xuống"
-                                    className="size-7"
-                                    disabled={i === sorted.length - 1}
-                                    onClick={() => move(sorted, i, 1)}
-                                  >
-                                    <ArrowDown className="size-3.5" />
-                                  </IconButton>
-                                </span>
+                              <span className="shrink-0 font-mono text-xs text-ink-3">{w.code}</span>
+                              <span
+                                className={cn("truncate hover:text-brand", w.status === "done" && "text-ink-3 line-through")}
+                              >
+                                {w.title}
+                              </span>
+                              {!nested && w.parent_id && codeById.has(w.parent_id) && (
+                                <span className="shrink-0 text-xs text-ink-3">· thuộc {codeById.get(w.parent_id)}</span>
                               )}
-                            </>
-                          )}
-                        </li>
-                      ))}
+                            </button>
+                            {w.subtask_count > 0 && (
+                              <span
+                                className={cn(
+                                  "flex shrink-0 items-center gap-0.5 text-xs tabular-nums",
+                                  w.subtask_done === w.subtask_count ? "text-emerald-600" : "text-ink-3",
+                                )}
+                                title="Subtask đã xong"
+                              >
+                                <ListChecks className="size-3.5" />
+                                {w.subtask_done}/{w.subtask_count}
+                              </span>
+                            )}
+                            <span className="hidden sm:inline-flex">
+                              <MetaBadge meta={PRIORITY[w.priority]} dot={false} />
+                            </span>
+                            {s && <MetaBadge meta={WORK_ITEM_STATUS[w.status]} />}
+                            <Badge className="w-12 justify-center tabular-nums">{w.story_points != null ? num(w.story_points) : "–"}</Badge>
+                            <Avatar
+                              size="sm"
+                              id={w.assignee_id}
+                              name={w.assignee_id ? byId.get(w.assignee_id)?.full_name : null}
+                            />
+                            {canEdit && (
+                              <>
+                                <SprintSelect
+                                  aria-label={`Chuyển ${w.code} sang sprint`}
+                                  className="hidden h-7 w-48 text-xs md:block"
+                                  pid={pid}
+                                  value={w.sprint_id}
+                                  onChange={(v) =>
+                                    patch.mutate({
+                                      id: w.id,
+                                      body: { sprint_id: v, ...(v === null ? { status: "backlog" } : {}) },
+                                    })
+                                  }
+                                />
+                                {!s && !nested && (
+                                  <span className="flex opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                                    <IconButton label="Lên" className="size-7" disabled={i === 0} onClick={() => move(top, i, -1)}>
+                                      <ArrowUp className="size-3.5" />
+                                    </IconButton>
+                                    <IconButton
+                                      label="Xuống"
+                                      className="size-7"
+                                      disabled={i === top.length - 1}
+                                      onClick={() => move(top, i, 1)}
+                                    >
+                                      <ArrowDown className="size-3.5" />
+                                    </IconButton>
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ))}
               </div>

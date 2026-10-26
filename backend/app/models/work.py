@@ -15,9 +15,10 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    select,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, aliased, column_property, mapped_column
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, pg_enum
 from app.models.enums import PriorityLevel, WorkActivityType, WorkItemStatus, WorkItemType
@@ -53,6 +54,15 @@ class WorkItem(TimestampMixin, SoftDeleteMixin, Base):
     due_date: Mapped[date | None] = mapped_column(Date)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+
+
+# Số subtask (chưa xoá) và số subtask đã xong — để hiển thị tiến độ "2/5" trên board / backlog
+_Subtask = aliased(WorkItem)
+_subtasks = select(func.count(_Subtask.id)).where(_Subtask.parent_id == WorkItem.id, _Subtask.deleted_at.is_(None))
+WorkItem.subtask_count = column_property(_subtasks.correlate_except(_Subtask).scalar_subquery())
+WorkItem.subtask_done = column_property(
+    _subtasks.where(_Subtask.status == WorkItemStatus.done).correlate_except(_Subtask).scalar_subquery()
+)
 
 
 class WorkLog(TimestampMixin, Base):

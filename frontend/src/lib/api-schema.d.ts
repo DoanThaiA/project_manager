@@ -2489,6 +2489,16 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Subtask Count
+             * @default 0
+             */
+            subtask_count: number;
+            /**
+             * Subtask Done
+             * @default 0
+             */
+            subtask_done: number;
         };
         /**
          * WorkItemStatus

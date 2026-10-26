@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Trash2 } from "lucide-react";
+import { Clock, CornerLeftUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { FileAttachments } from "@/components/project/file-attachments";
@@ -14,6 +14,7 @@ import {
   WorkItemImages,
 } from "@/components/project/work-item-images";
 import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
+import { Subtasks } from "@/components/project/subtasks";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { TextImagesButton, withoutImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,8 @@ export function WorkItemModal({
   const { byId } = useMembers(pid);
   const [form, setForm] = useState<FormState>(() => initial(item, defaults));
   const [logOpen, setLogOpen] = useState(false);
+  // Mở subtask / công việc cha chồng lên modal hiện tại
+  const [related, setRelated] = useState<WorkItem | null>(null);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const editing = !!item;
   const canEdit = editing ? can("work_item.update") : can("work_item.create");
@@ -126,6 +129,13 @@ export function WorkItemModal({
         })
       ).data.items,
   });
+
+  const parent = useQuery({
+    queryKey: ["project", pid, "work-items", item?.parent_id],
+    queryFn: async () => (await api.get<WorkItem>(`/projects/${pid}/work-items/${item!.parent_id}`)).data,
+    enabled: !!item?.parent_id,
+  });
+  const hasSubtasks = !!item && !item.parent_id && item.subtask_count > 0;
 
   const logs = useQuery({
     queryKey: ["project", pid, "work-logs", { work_item_id: item?.id }],
@@ -223,6 +233,18 @@ export function WorkItemModal({
           </>
         }
       >
+        {parent.data && (
+          <button
+            type="button"
+            onClick={() => setRelated(parent.data)}
+            className="mb-4 flex w-full items-center gap-2 rounded-lg bg-subtle px-3 py-2 text-left text-sm hover:bg-brand-soft"
+          >
+            <CornerLeftUp className="size-4 shrink-0 text-ink-3" />
+            <span className="text-ink-3">Subtask của</span>
+            <span className="shrink-0 font-mono text-xs text-ink-3">{parent.data.code}</span>
+            <span className="truncate font-medium">{parent.data.title}</span>
+          </button>
+        )}
         <fieldset disabled={!canEdit} className="grid gap-4 sm:grid-cols-6">
           <Field label="Loại" className="sm:col-span-2">
             {(id) => <EnumSelect id={id} options={WORK_ITEM_TYPE} value={form.type} onChange={(v) => v && set("type", v)} />}
@@ -254,7 +276,11 @@ export function WorkItemModal({
               />
             )}
           </Field>
-          <Field label="Trạng thái" className="sm:col-span-2">
+          <Field
+            label="Trạng thái"
+            hint={hasSubtasks ? "Tự chuyển Xong khi mọi subtask xong" : undefined}
+            className="sm:col-span-2"
+          >
             {(id) => (
               <EnumSelect id={id} options={WORK_ITEM_STATUS} value={form.status} onChange={(v) => v && set("status", v)} />
             )}
@@ -343,6 +369,13 @@ export function WorkItemModal({
           </Field>
         </fieldset>
 
+        {item && !item.parent_id && (
+          <section className="mt-6">
+            <h4 className="mb-2 text-[13px] font-semibold text-ink-2">Subtask</h4>
+            <Subtasks pid={pid} parent={item} canEdit={canEdit} onOpen={setRelated} />
+          </section>
+        )}
+
         <WorkItemImages images={images} />
 
         <section className="mt-6">
@@ -384,6 +417,7 @@ export function WorkItemModal({
         )}
       </Modal>
       {logOpen && item && <WorkLogModal open pid={pid} workItem={item} onClose={() => setLogOpen(false)} />}
+      {related && <WorkItemModal key={related.id} pid={pid} item={related} onClose={() => setRelated(null)} />}
     </>
   );
 }

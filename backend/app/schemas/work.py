@@ -73,6 +73,8 @@ class WorkItemOut(ORMModel):
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+    subtask_count: int = 0
+    subtask_done: int = 0
 
 
 class WorkLogCreate(BaseModel):

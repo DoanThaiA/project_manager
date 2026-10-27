@@ -65,6 +65,8 @@ class UserOut(ORMModel):
     avatar_url: str | None
     job_title: str | None
     customer_id: int | None
+    company_id: int | None = None
+    employee_code: str | None = None
     status: UserStatus
     is_system_admin: bool
     last_login_at: datetime | None

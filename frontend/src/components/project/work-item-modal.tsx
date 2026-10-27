@@ -13,11 +13,12 @@ import {
   useWorkItemImages,
   WorkItemImages,
 } from "@/components/project/work-item-images";
-import { EnumSelect, MemberSelect, SprintSelect } from "@/components/project/selects";
+import { EnumSelect, MultiMemberSelect, SprintSelect } from "@/components/project/selects";
 import { Subtasks } from "@/components/project/subtasks";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { TextImagesButton, useInlineImages, withoutImages } from "@/components/text-images";
 import { Button } from "@/components/ui/button";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { Field, Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
@@ -49,7 +50,7 @@ type FormState = {
   remaining_hours: string;
   requirement_id: number | null;
   sprint_id: number | null;
-  assignee_id: number | null;
+  assignee_ids: number[];
   due_date: string;
   parent_id: number | null;
 };
@@ -78,7 +79,7 @@ function initial(item?: WorkItem, defaults?: Partial<FormState>): FormState {
     remaining_hours: str(item?.remaining_hours),
     requirement_id: item?.requirement_id ?? null,
     sprint_id: item?.sprint_id ?? null,
-    assignee_id: item?.assignee_id ?? null,
+    assignee_ids: item?.assignee_ids ?? [],
     due_date: item?.due_date ?? "",
     parent_id: item?.parent_id ?? null,
     ...defaults,
@@ -226,7 +227,7 @@ export function WorkItemModal({
         remaining_hours: numOrNull(form.remaining_hours),
         requirement_id: form.requirement_id,
         sprint_id: form.sprint_id,
-        assignee_id: form.assignee_id,
+        assignee_ids: form.assignee_ids,
         due_date: form.due_date || null,
         parent_id: form.parent_id,
       };
@@ -234,7 +235,9 @@ export function WorkItemModal({
         // Chỉ gửi trường đã đổi để không đụng quyền giao việc khi không cần
         const before = initial(item) as Record<string, unknown>;
         const changed = Object.fromEntries(
-          Object.entries(body).filter(([k]) => (form as Record<string, unknown>)[k] !== before[k]),
+          Object.entries(body).filter(
+            ([k]) => JSON.stringify((form as Record<string, unknown>)[k]) !== JSON.stringify(before[k]),
+          ),
         );
         return (await api.patch<WorkItem>(`/projects/${pid}/work-items/${item.id}`, changed)).data;
       }
@@ -379,23 +382,28 @@ export function WorkItemModal({
           <Field
             label="Trạng thái"
             hint={hasSubtasks ? "Tự chuyển Xong khi mọi subtask xong" : undefined}
-            className="sm:col-span-2"
+            className="sm:col-span-3"
           >
             {(id) => (
               <EnumSelect id={id} options={WORK_ITEM_STATUS} value={form.status} onChange={(v) => v && set("status", v)} />
             )}
           </Field>
-          <Field label="Ưu tiên" className="sm:col-span-2">
+          <Field label="Ưu tiên" className="sm:col-span-3">
             {(id) => <EnumSelect id={id} options={PRIORITY} value={form.priority} onChange={(v) => v && set("priority", v)} />}
           </Field>
-          <Field label="Người thực hiện" className="sm:col-span-2">
+          <Field
+            label="Người thực hiện"
+            hint={can("work_item.assign") ? "Giao cho một hoặc nhiều người" : "Bạn chỉ có thể tự nhận / tự gỡ mình"}
+            className="sm:col-span-6"
+          >
             {(id) => (
-              <MemberSelect
+              <MultiMemberSelect
                 id={id}
                 pid={pid}
-                value={form.assignee_id}
-                onChange={(v) => set("assignee_id", v)}
-                disabled={!can("work_item.assign") && form.assignee_id !== me?.id && form.assignee_id !== null}
+                value={form.assignee_ids}
+                onChange={(v) => set("assignee_ids", v)}
+                only={can("work_item.assign") ? undefined : me ? [me.id] : []}
+                disabled={!canEdit}
               />
             )}
           </Field>
@@ -501,10 +509,10 @@ export function WorkItemModal({
                   <li key={l.id} className="flex items-start gap-3 px-3 py-2 text-sm">
                     <span className="w-12 shrink-0 font-medium tabular-nums">{fmtHours(l.hours)}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1">
-                        <span className="truncate">{withoutImages(l.description)}</span>
+                      <div className="flex items-start gap-1">
+                        <ExpandableText className="flex-1" text={withoutImages(l.description)} />
                         <TextImagesButton pid={pid} text={l.description} />
-                      </p>
+                      </div>
                       <p className="text-xs text-ink-3">
                         {byId.get(l.user_id)?.full_name ?? `#${l.user_id}`} · {fmtDate(l.log_date)} ·{" "}
                         {ACTIVITY_TYPE[l.activity_type]}

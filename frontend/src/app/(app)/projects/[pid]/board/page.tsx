@@ -11,7 +11,7 @@ import { WorkItemModal } from "@/components/project/work-item-modal";
 import { MetaBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Select } from "@/components/ui/form";
-import { Avatar, Card, Empty, ProgressBar, Spinner } from "@/components/ui/misc";
+import { AvatarStack, Card, Empty, ProgressBar, Spinner } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -90,7 +90,7 @@ export default function BoardPage() {
 
   const all = items.data ?? [];
   const codeById = new Map(all.map((w) => [w.id, w.code]));
-  const visible = mine ? all.filter((w) => w.assignee_id === me?.id) : all;
+  const visible = mine ? all.filter((w) => me != null && w.assignee_ids.includes(me.id)) : all;
   const planned = all.reduce((s, w) => s + num(w.story_points), 0);
   const done = all.filter((w) => w.status === "done").reduce((s, w) => s + num(w.story_points), 0);
   const unfinished = all.filter((w) => w.status !== "done" && w.status !== "cancelled").length;
@@ -203,7 +203,6 @@ export default function BoardPage() {
                 </header>
                 <div className="flex flex-1 flex-col gap-2">
                   {cards.map((w) => {
-                    const assignee = w.assignee_id ? byId.get(w.assignee_id) : undefined;
                     return (
                       <article
                         key={w.id}
@@ -252,7 +251,7 @@ export default function BoardPage() {
                                 {num(w.story_points)}
                               </span>
                             )}
-                            <Avatar size="sm" id={w.assignee_id} name={assignee?.full_name} />
+                            <AvatarStack users={w.assignee_ids.map((id) => ({ id, name: byId.get(id)?.full_name }))} />
                           </span>
                         </div>
                         {/* Thay thế kéo-thả cho bàn phím / màn hình cảm ứng */}

@@ -12,6 +12,7 @@ erDiagram
     permissions ||--o{ role_permissions : ""
     customers ||--o{ customer_contacts : "đầu mối"
     customers ||--o{ users : "tài khoản KH"
+    companies ||--o{ users : "nhân viên (LMS)"
     customers ||--o{ projects : "đặt hàng"
     projects ||--o{ project_members : ""
     users ||--o{ project_members : ""
@@ -41,13 +42,14 @@ erDiagram
 | | `role_permissions` | Ma trận vai trò ↔ chức năng |
 | | `user_roles` | Vai trò cấp hệ thống của user |
 | | `project_members` | Thành viên + vai trò trong từng dự án (1 người nhiều vai trò được) |
+| Doanh nghiệp (LMS) | `companies` | Doanh nghiệp dùng cho hệ thống LMS (`lms_mcv`); `users.company_id` + `users.employee_code` (duy nhất trong công ty): đăng nhập LMS bằng mã công ty + mã nhân viên — revision 0008. Bảng `lms_*` cùng database do repo `lms_mcv` quản lý (phiên bản ở `alembic_version_lms`) |
 | Khách hàng | `customers`, `customer_contacts` | Thông tin khách hàng, người liên hệ (tối đa 1 đầu mối chính) |
 | Dự án | `projects` | `key` (ERP, CRM…) làm tiền tố mã, duy nhất giữa các dự án chưa xoá (xoá mềm xong dùng lại được; mã yêu cầu / công việc duy nhất trong dự án — revision 0003), PO, Scrum Master, độ dài sprint, ngân sách giờ |
 | | `sprints` | Sprint goal, ngày, capacity, ghi chú Review/Retrospective |
 | Yêu cầu KH | `requirements` | Mã tự sinh `ERP-REQ-0001`, loại, nguồn, ưu tiên, trạng thái, tiêu chí nghiệm thu, ngày mong muốn/cam kết, duyệt/từ chối |
 | | `requirement_comments` | Trao đổi; `is_internal` để ẩn với khách hàng |
 | | `requirement_status_history` | Lịch sử chuyển trạng thái (tự động) |
-| Backlog | `work_items` | Epic/Story/Task/Bug/Subtask, mã `ERP-12`, story point, ước lượng giờ, `sprint_id NULL` = Product Backlog |
+| Backlog | `work_items` | Epic/Story/Task/Bug/Subtask, mã `ERP-12`, story point, ước lượng giờ, `sprint_id NULL` = Product Backlog; `assignee_ids bigint[]` = nhiều người phụ trách (GIN index, API kiểm tra là thành viên dự án) — revision 0009 |
 | Log | `work_logs` | **Log công việc**: ai, ngày nào, bao nhiêu giờ, làm gì, cho task/yêu cầu nào |
 | | `activity_logs` | **Log hoạt động (audit)**: ai đổi gì, lúc nào, giá trị cũ/mới (JSONB), IP |
 | Khác | `attachments` | File đính kèm cho yêu cầu / công việc / bình luận / sprint; ảnh lưu trên Cloudflare Images. Ảnh công việc có `category`: `bug` (ảnh lỗi) / `result` (ảnh sau khi sửa) — revision 0002. `entity_type = 'inline'`: ảnh dán trong ô văn bản (yêu cầu, bình luận, log công việc, sprint…), gắn với dự án, văn bản giữ dấu `[Ảnh: <tên file>]` — revision 0004 |

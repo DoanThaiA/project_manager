@@ -59,6 +59,11 @@ class User(TimestampMixin, SoftDeleteMixin, Base):
     avatar_url: Mapped[str | None] = mapped_column(String(500))
     job_title: Mapped[str | None] = mapped_column(String(100))
     customer_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("customers.id"))
+    # Doanh nghiệp + mã nhân viên, dùng khi đăng nhập LMS lms_mcv (revision 0008, bảng companies)
+    company_id: Mapped[int | None] = mapped_column(BigInteger, comment="Doanh nghiệp của nhân viên (LMS)")
+    employee_code: Mapped[str | None] = mapped_column(
+        CITEXT, comment="Mã nhân viên, duy nhất trong công ty; đăng nhập LMS bằng mã công ty + mã nhân viên"
+    )
     status: Mapped[UserStatus] = mapped_column(pg_enum(UserStatus, "user_status"), default=UserStatus.active)
     is_system_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

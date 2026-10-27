@@ -1,5 +1,7 @@
 from datetime import date, timedelta
 
+from sqlalchemy import select
+
 
 async def test_work_item_flow_updates_requirement(client, login, project_id):
     po, dev = await login("po.an"), await login("dev.cuong")
@@ -36,9 +38,37 @@ async def test_work_item_flow_updates_requirement(client, login, project_id):
 
 async def test_dev_cannot_assign_to_others(client, login, project_id):
     resp = await client.post(
-        f"/projects/{project_id}/work-items", json={"title": "x", "assignee_id": 5}, headers=await login("dev.cuong")
+        f"/projects/{project_id}/work-items", json={"title": "x", "assignee_ids": [5]}, headers=await login("dev.cuong")
     )
     assert resp.status_code == 403
+
+
+async def test_multiple_assignees(client, login, project_id):
+    from app.db.session import AsyncSessionLocal
+    from app.models import User
+
+    async with AsyncSessionLocal() as db:
+        rows = await db.execute(select(User.username, User.id).where(User.username.in_(["dev.cuong", "qa.dung"])))
+        ids = dict(rows.all())
+    dev, qa = ids["dev.cuong"], ids["qa.dung"]
+    base = f"/projects/{project_id}/work-items"
+    po = await login("po.an")
+
+    resp = await client.post(base, json={"title": "Việc nhiều người", "assignee_ids": [dev, qa, dev]}, headers=po)
+    assert resp.status_code == 201, resp.text
+    item = resp.json()
+    assert item["assignee_ids"] == [dev, qa]  # bỏ trùng, giữ thứ tự
+
+    for uid in (dev, qa):
+        found = (await client.get(base, params={"assignee_id": uid, "size": 500}, headers=po)).json()["items"]
+        assert item["id"] in [w["id"] for w in found]
+
+    # Dev tự gỡ mình được, nhưng không gỡ người khác
+    dev_headers = await login("dev.cuong")
+    resp = await client.patch(f"{base}/{item['id']}", json={"assignee_ids": []}, headers=dev_headers)
+    assert resp.status_code == 403
+    resp = await client.patch(f"{base}/{item['id']}", json={"assignee_ids": [qa]}, headers=dev_headers)
+    assert resp.status_code == 200 and resp.json()["assignee_ids"] == [qa]
 
 
 async def test_cross_project_sprint_rejected(client, login):

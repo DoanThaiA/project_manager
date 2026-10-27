@@ -60,7 +60,7 @@ async def _enqueue_status_changes(db: AsyncSession, changes: list[StatusChange])
         return
 
     sprint_ids = {w.sprint_id for w in items.values() if w.sprint_id}
-    user_ids = {c.actor_id for c in changes if c.actor_id} | {w.assignee_id for w in items.values() if w.assignee_id}
+    user_ids = {c.actor_id for c in changes if c.actor_id} | {uid for w in items.values() for uid in w.assignee_ids}
     ctx = RenderContext(
         projects={
             p.id: p for p in await db.scalars(select(Project).where(Project.id.in_({c.project_id for c in changes})))

@@ -9,6 +9,7 @@ import { useMembers, useProjectPerms, useRoles, useSprints } from "./hooks";
 const USER_FIELDS = new Set([
   "user_id",
   "assignee_id",
+  "assignee_ids",
   "reporter_id",
   "approved_by",
   "created_by",
@@ -24,6 +25,9 @@ export function useProjectActivityResolver(pid: number): ActivityResolver {
   const { data: roles } = useRoles();
   return useCallback(
     (field, value) => {
+      // Danh sách người (vd: assignee_ids của công việc)
+      if (Array.isArray(value) && USER_FIELDS.has(field))
+        return value.map((id) => byId.get(id)?.full_name ?? `#${id}`).join(", ") || "—";
       if (typeof value !== "number") return undefined;
       if (USER_FIELDS.has(field)) return byId.get(value)?.full_name;
       if (field === "sprint_id") return sprints?.find((s) => s.id === value)?.name;

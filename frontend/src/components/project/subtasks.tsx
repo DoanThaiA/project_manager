@@ -8,7 +8,7 @@ import { MemberSelect } from "@/components/project/selects";
 import { MetaBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
-import { Avatar, ProgressBar } from "@/components/ui/misc";
+import { AvatarStack, ProgressBar } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -56,7 +56,7 @@ export function Subtasks({
         title: title.trim(),
         parent_id: parent.id,
         priority: parent.priority,
-        assignee_id: assignee,
+        assignee_ids: assignee ? [assignee] : [],
       }),
     onSuccess: () => {
       setTitle("");
@@ -119,7 +119,7 @@ export function Subtasks({
                   </span>
                 </button>
                 <MetaBadge meta={WORK_ITEM_STATUS[s.status]} />
-                <Avatar size="sm" id={s.assignee_id} name={s.assignee_id ? byId.get(s.assignee_id)?.full_name : null} />
+                <AvatarStack users={s.assignee_ids.map((id) => ({ id, name: byId.get(id)?.full_name }))} />
               </li>
             );
           })}

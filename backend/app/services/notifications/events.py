@@ -71,7 +71,7 @@ SELECT DISTINCT tc.id
         tc.project_id = :project_id
         OR (tc.user_id IS NOT NULL
             AND tc.user_id IS DISTINCT FROM CAST(:actor_id AS bigint)
-            AND (s.scope = 'all' OR tc.user_id IN (:assignee_id, :reporter_id))
+            AND (s.scope = 'all' OR tc.user_id = :reporter_id OR tc.user_id = ANY (CAST(:assignee_ids AS bigint[])))
             AND fn_user_has_permission(tc.user_id, 'work_item.view', :project_id))
    )
 """)
@@ -85,7 +85,7 @@ async def status_recipients(db: AsyncSession, change: StatusChange, item: WorkIt
             "status": change.new,
             "project_id": change.project_id,
             "actor_id": change.actor_id,
-            "assignee_id": item.assignee_id or 0,
+            "assignee_ids": item.assignee_ids,
             "reporter_id": item.reporter_id or 0,
         },
     )
@@ -130,8 +130,8 @@ def render_status_changes(changes: list[StatusChange], ctx: RenderContext) -> st
             f"{_e(_status(first.old))} → <b>{_e(_status(first.new))}</b>",
         ]
         who = f"👤 {_e(actor)} đã chuyển"
-        if item.assignee_id:
-            who += f" · Giao cho: {_e(ctx.user_names.get(item.assignee_id, '—'))}"
+        if item.assignee_ids:
+            who += " · Giao cho: " + ", ".join(_e(ctx.user_names.get(uid, "—")) for uid in item.assignee_ids)
         lines.append(who)
         where = f"📁 {_e(project.key)} · {_e(project.name)}"
         if item.sprint_id and item.sprint_id in ctx.sprints:

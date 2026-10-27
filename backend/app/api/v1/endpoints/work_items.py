@@ -27,8 +27,8 @@ async def get_work_item(db: AsyncSession, project_id: int, item_id: int) -> Work
 
 async def _validate_refs(db: AsyncSession, ctx: ProjectContext, values: dict, item_id: int | None = None) -> None:
     pid = ctx.project.id
-    if "assignee_id" in values:
-        await ensure_member(db, pid, values["assignee_id"], "assignee_id")
+    for user_id in values.get("assignee_ids") or []:
+        await ensure_member(db, pid, user_id, "assignee_ids")
     if values.get("requirement_id"):
         await get_requirement(db, pid, values["requirement_id"])
     if values.get("sprint_id"):
@@ -37,6 +37,17 @@ async def _validate_refs(db: AsyncSession, ctx: ProjectContext, values: dict, it
             raise not_found("sprint")
         if sprint.status in CLOSED_SPRINT:
             raise HTTPException(status_code=409, detail="Không thể thêm việc vào sprint đã kết thúc / huỷ")
+
+
+async def _check_assignees(db: AsyncSession, ctx: ProjectContext, values: dict, old: list[int]) -> None:
+    """Bỏ trùng người phụ trách; thêm / gỡ người khác (ngoài chính mình) cần quyền 'work_item.assign'."""
+    if values.get("assignee_ids") is None:
+        values.pop("assignee_ids", None)
+        return
+    values["assignee_ids"] = list(dict.fromkeys(values["assignee_ids"]))
+    changed = set(values["assignee_ids"]) ^ set(old)
+    if changed - {ctx.user.id} and not await has_permission(db, ctx.user, "work_item.assign", ctx.project.id):
+        raise HTTPException(status_code=403, detail="Yêu cầu quyền 'work_item.assign' để giao việc cho người khác")
 
 
 async def _check_parent(db: AsyncSession, project_id: int, parent_id: int, item_id: int | None) -> WorkItem:
@@ -149,7 +160,7 @@ async def list_work_items(
     if type_:
         stmt = stmt.where(WorkItem.type.in_(type_))
     if assignee_id is not None:
-        stmt = stmt.where(WorkItem.assignee_id == assignee_id)
+        stmt = stmt.where(WorkItem.assignee_ids.contains([assignee_id]))
     if requirement_id is not None:
         stmt = stmt.where(WorkItem.requirement_id == requirement_id)
     if parent_id is not None:
@@ -164,10 +175,7 @@ async def create_work_item(
     db: AsyncSession = Depends(get_db),
 ):
     values = body.model_dump(exclude_none=True)
-    if body.assignee_id not in (None, ctx.user.id) and not await has_permission(
-        db, ctx.user, "work_item.assign", ctx.project.id
-    ):
-        raise HTTPException(status_code=403, detail="Yêu cầu quyền 'work_item.assign' để giao việc cho người khác")
+    await _check_assignees(db, ctx, values, [])
     if body.type == WorkItemType.subtask and not body.parent_id:
         raise HTTPException(status_code=422, detail="Subtask phải chọn công việc cha")
     if body.parent_id:
@@ -220,12 +228,7 @@ async def update_work_item(
 ):
     item = await get_work_item(db, ctx.project.id, item_id)
     values = body.model_dump(exclude_unset=True)
-    if (
-        "assignee_id" in values
-        and values["assignee_id"] not in (None, ctx.user.id)
-        and not await has_permission(db, ctx.user, "work_item.assign", ctx.project.id)
-    ):
-        raise HTTPException(status_code=403, detail="Yêu cầu quyền 'work_item.assign' để giao việc cho người khác")
+    await _check_assignees(db, ctx, values, item.assignee_ids)
     old_parent_id = item.parent_id
     await _resolve_parent(db, ctx.project.id, item, values)
     await _validate_refs(db, ctx, values, item_id)

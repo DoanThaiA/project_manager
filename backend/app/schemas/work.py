@@ -21,7 +21,7 @@ class WorkItemCreate(BaseModel):
     requirement_id: int | None = None
     sprint_id: int | None = None
     parent_id: int | None = None
-    assignee_id: int | None = None
+    assignee_ids: list[int] = Field(default=[], description="Người phụ trách (nhiều người)")
     backlog_rank: float | None = Field(default=None, description="Mặc định: cuối backlog")
     start_date: date | None = None
     due_date: date | None = None
@@ -41,7 +41,7 @@ class WorkItemUpdate(BaseModel):
     requirement_id: int | None = None
     sprint_id: int | None = None
     parent_id: int | None = None
-    assignee_id: int | None = None
+    assignee_ids: list[int] | None = None
     backlog_rank: float | None = None
     start_date: date | None = None
     due_date: date | None = None
@@ -64,7 +64,7 @@ class WorkItemOut(ORMModel):
     requirement_id: int | None
     sprint_id: int | None
     parent_id: int | None
-    assignee_id: int | None
+    assignee_ids: list[int]
     reporter_id: int | None
     backlog_rank: float
     start_date: date | None

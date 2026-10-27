@@ -62,9 +62,9 @@ SELECT set_config('app.status_note', 'Khách hàng xác nhận trong buổi họ
 UPDATE requirements SET status = 'approved' WHERE code = 'ERP-REQ-0001';
 
 INSERT INTO work_items (project_id, type, title, status, story_points, original_estimate_hours, remaining_hours,
-                        requirement_id, sprint_id, assignee_id, backlog_rank)
+                        requirement_id, sprint_id, assignee_ids, backlog_rank)
 SELECT p.id, x.type::work_item_type, x.title, x.status::work_item_status, x.sp, x.est, x.est,
-       r.id, s.id, u.id, x.rnk
+       r.id, s.id, ARRAY[u.id], x.rnk
   FROM projects p
   JOIN requirements r ON r.code = 'ERP-REQ-0001'
   JOIN sprints s      ON s.project_id = p.id AND s.sprint_no = 1

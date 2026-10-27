@@ -146,6 +146,7 @@ export const FIELD_LABEL: Record<string, string> = {
   description: "Mô tả",
   priority: "Ưu tiên",
   assignee_id: "Người phụ trách",
+  assignee_ids: "Người phụ trách",
   due_date: "Hạn",
   sprint_id: "Sprint",
   story_points: "Story point",

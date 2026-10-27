@@ -47,7 +47,7 @@ class WorkItem(TimestampMixin, SoftDeleteMixin, Base):
     requirement_id: Mapped[int | None] = mapped_column(BigInteger)
     sprint_id: Mapped[int | None] = mapped_column(BigInteger)
     parent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("work_items.id"))
-    assignee_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"))
+    assignee_ids: Mapped[list[int]] = mapped_column(ARRAY(BigInteger), default=list)
     reporter_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"))
     backlog_rank: Mapped[float] = mapped_column(Float, default=0)
     start_date: Mapped[date | None] = mapped_column(Date)

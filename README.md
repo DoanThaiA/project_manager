@@ -113,7 +113,7 @@ Xác thực bằng JWT Bearer: `POST /auth/login` (form `username`, `password`) 
 | Dự án | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{pid}`, `GET /projects/{pid}/my-permissions`, `GET/POST/DELETE /projects/{pid}/members` |
 | Sprint | `/projects/{pid}/sprints`, `POST …/{sid}/start`, `POST …/{sid}/complete`, `GET …/{sid}/progress` |
 | Yêu cầu KH | `/projects/{pid}/requirements`, `POST …/{rid}/status`, `GET …/{rid}/history`, `GET …/{rid}/activity`, `…/{rid}/comments` |
-| Backlog | `/projects/{pid}/work-items` (lọc `backlog=true`, `sprint_id`, `status`, `assignee_id`…) |
+| Backlog | `/projects/{pid}/work-items` (lọc `backlog=true`, `sprint_id`, `status`, `assignee_id` = công việc có người này trong danh sách phụ trách…) |
 | Log công việc | `/projects/{pid}/work-logs`, `GET /me/work-logs` |
 | Báo cáo & nhật ký | `GET /projects/{pid}/reports/summary`, `GET /projects/{pid}/reports/work-logs?group_by=user\|date\|activity_type\|work_item\|sprint`, `GET /projects/{pid}/activity-logs`, `GET /activity-logs` |
 

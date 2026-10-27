@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { EnumSelect, MemberSelect } from "@/components/project/selects";
 import { WorkLogModal } from "@/components/project/work-log-form";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { Badge } from "@/components/ui/badge";
 import { TextImagesButton, withoutImages } from "@/components/text-images";
 import { Button, IconButton } from "@/components/ui/button";
@@ -162,10 +163,10 @@ export default function WorkLogsPage() {
                     </td>
                     <td className="text-right font-semibold tabular-nums">{fmtHours(l.hours)}</td>
                     <td className="max-w-sm">
-                      <p className="flex items-center gap-1">
-                        <span className="truncate">{withoutImages(l.description)}</span>
+                      <div className="flex items-start gap-1">
+                        <ExpandableText className="flex-1" text={withoutImages(l.description)} />
                         <TextImagesButton pid={pid} text={l.description} />
-                      </p>
+                      </div>
                       {item && (
                         <p className="truncate text-xs text-ink-3">
                           <span className="font-mono">{item.code}</span> · {item.title}

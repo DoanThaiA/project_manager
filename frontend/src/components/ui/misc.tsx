@@ -101,6 +101,33 @@ export function Avatar({ name, id, size = "md" }: { name?: string | null; id?: n
   );
 }
 
+/** Nhiều avatar chồng lên nhau (người phụ trách công việc); quá `max` người thì hiện "+n". */
+export function AvatarStack({
+  users,
+  max = 3,
+}: {
+  users: { id: number; name?: string | null }[];
+  max?: number;
+}) {
+  if (!users.length) return <Avatar size="sm" />;
+  const shown = users.length > max ? users.slice(0, max - 1) : users;
+  const rest = users.length - shown.length;
+  return (
+    <span className="flex shrink-0 -space-x-1.5" title={users.map((u) => u.name ?? `#${u.id}`).join(", ")}>
+      {shown.map((u) => (
+        <span key={u.id} className="rounded-full ring-2 ring-surface">
+          <Avatar size="sm" id={u.id} name={u.name} />
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="inline-flex size-6 items-center justify-center rounded-full bg-subtle text-[10px] font-semibold text-ink-2 ring-2 ring-surface">
+          +{rest}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function UserChip({ name, id }: { name?: string | null; id?: number | null }) {
   if (!name) return <span className="text-ink-3">—</span>;
   return (

@@ -10,7 +10,7 @@ import { LinkedWorkItem } from "@/components/project/linked-work-item";
 import { WorkItemModal } from "@/components/project/work-item-modal";
 import { Badge, MetaBadge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
-import { Avatar, Card, Spinner } from "@/components/ui/misc";
+import { AvatarStack, Card, Spinner } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { useMembers, useProjectId, useProjectPerms, useSprints } from "@/lib/hooks";
@@ -276,10 +276,8 @@ export default function BacklogPage() {
                             </span>
                             {s && <MetaBadge meta={WORK_ITEM_STATUS[w.status]} />}
                             <Badge className="w-12 justify-center tabular-nums">{w.story_points != null ? num(w.story_points) : "–"}</Badge>
-                            <Avatar
-                              size="sm"
-                              id={w.assignee_id}
-                              name={w.assignee_id ? byId.get(w.assignee_id)?.full_name : null}
+                            <AvatarStack
+                              users={w.assignee_ids.map((id) => ({ id, name: byId.get(id)?.full_name }))}
                             />
                             {canEdit && (
                               <>

@@ -16,7 +16,7 @@ import { PASTE_HINT, RichText, useInlineImages } from "@/components/text-images"
 import { Badge, MetaBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Textarea } from "@/components/ui/form";
-import { Card, CardHeader, Empty, ProgressBar, Spinner, UserChip } from "@/components/ui/misc";
+import { AvatarStack, Card, CardHeader, Empty, ProgressBar, Spinner, UserChip } from "@/components/ui/misc";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, errorMessage } from "@/lib/api";
@@ -403,7 +403,11 @@ export default function RequirementDetailPage() {
                         <MetaBadge meta={WORK_ITEM_TYPE[w.type]} dot={false} />
                         <span className="font-mono text-xs text-ink-3">{w.code}</span>
                         <span className="min-w-0 flex-1 truncate">{w.title}</span>
-                        <UserChip id={w.assignee_id} name={w.assignee_id ? byId.get(w.assignee_id)?.full_name : null} />
+                        {w.assignee_ids.length > 1 ? (
+                          <AvatarStack users={w.assignee_ids.map((id) => ({ id, name: byId.get(id)?.full_name }))} />
+                        ) : (
+                          <UserChip id={w.assignee_ids[0]} name={byId.get(w.assignee_ids[0])?.full_name} />
+                        )}
                         <MetaBadge meta={WORK_ITEM_STATUS[w.status]} />
                       </button>
                     </li>

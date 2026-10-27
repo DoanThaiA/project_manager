@@ -128,7 +128,7 @@ async def new_item(client, login, project_id, title="Việc test thông báo") -
         sprint_id = await db.scalar(select(Sprint.id).where(Sprint.project_id == project_id, Sprint.sprint_no == 1))
     resp = await client.post(
         f"/projects/{project_id}/work-items",
-        json={"title": title, "assignee_id": dev_id, "sprint_id": sprint_id, "status": "todo"},
+        json={"title": title, "assignee_ids": [dev_id], "sprint_id": sprint_id, "status": "todo"},
         headers=await login("po.an"),
     )
     assert resp.status_code == 201, resp.text

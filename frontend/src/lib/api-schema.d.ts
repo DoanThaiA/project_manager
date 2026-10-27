@@ -1482,6 +1482,10 @@ export interface components {
             job_title: string | null;
             /** Customer Id */
             customer_id: number | null;
+            /** Company Id */
+            company_id?: number | null;
+            /** Employee Code */
+            employee_code?: string | null;
             status: components["schemas"]["UserStatus"];
             /** Is System Admin */
             is_system_admin: boolean;
@@ -2348,6 +2352,10 @@ export interface components {
             job_title: string | null;
             /** Customer Id */
             customer_id: number | null;
+            /** Company Id */
+            company_id?: number | null;
+            /** Employee Code */
+            employee_code?: string | null;
             status: components["schemas"]["UserStatus"];
             /** Is System Admin */
             is_system_admin: boolean;
@@ -2379,6 +2387,10 @@ export interface components {
             job_title: string | null;
             /** Customer Id */
             customer_id: number | null;
+            /** Company Id */
+            company_id?: number | null;
+            /** Employee Code */
+            employee_code?: string | null;
             status: components["schemas"]["UserStatus"];
             /** Is System Admin */
             is_system_admin: boolean;
@@ -2461,8 +2473,12 @@ export interface components {
             sprint_id?: number | null;
             /** Parent Id */
             parent_id?: number | null;
-            /** Assignee Id */
-            assignee_id?: number | null;
+            /**
+             * Assignee Ids
+             * @description Người phụ trách (nhiều người)
+             * @default []
+             */
+            assignee_ids: number[];
             /**
              * Backlog Rank
              * @description Mặc định: cuối backlog
@@ -2507,8 +2523,8 @@ export interface components {
             sprint_id: number | null;
             /** Parent Id */
             parent_id: number | null;
-            /** Assignee Id */
-            assignee_id: number | null;
+            /** Assignee Ids */
+            assignee_ids: number[];
             /** Reporter Id */
             reporter_id: number | null;
             /** Backlog Rank */
@@ -2575,8 +2591,8 @@ export interface components {
             sprint_id?: number | null;
             /** Parent Id */
             parent_id?: number | null;
-            /** Assignee Id */
-            assignee_id?: number | null;
+            /** Assignee Ids */
+            assignee_ids?: number[] | null;
             /** Backlog Rank */
             backlog_rank?: number | null;
             /** Start Date */

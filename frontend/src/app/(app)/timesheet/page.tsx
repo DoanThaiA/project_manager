@@ -9,6 +9,7 @@ import { useState } from "react";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { inlineFileNames, inlineImageNames, withoutImages } from "@/components/text-images";
 import { Button, IconButton } from "@/components/ui/button";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { Card, CardHeader, Empty, PageHeader, Spinner, Table } from "@/components/ui/misc";
 import { api } from "@/lib/api";
 import { useProjects } from "@/lib/hooks";
@@ -164,8 +165,8 @@ export default function TimesheetPage() {
                     </span>
                     <span className="w-12 shrink-0 font-semibold tabular-nums">{fmtHours(l.hours)}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1">
-                        <span className="truncate">{withoutImages(l.description)}</span>
+                      <span className="flex items-start gap-1">
+                        <ExpandableText className="flex-1" text={withoutImages(l.description)} />
                         {inlineImageNames(l.description).length > 0 && (
                           <ImageIcon className="size-3.5 shrink-0 text-ink-3" aria-label="Có ảnh" />
                         )}

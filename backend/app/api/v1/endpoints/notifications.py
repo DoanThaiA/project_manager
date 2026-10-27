@@ -22,6 +22,7 @@ from app.schemas.notification import (
 )
 from app.services.common import not_found
 from app.services.notifications import telegram
+from app.services.notifications.events import valid_statuses
 from app.services.notifications.worker import status as bot_status
 
 router = APIRouter()
@@ -84,6 +85,11 @@ async def _chat_out(db: AsyncSession, chats: list[TelegramChat]) -> list[Telegra
 async def _set_subscription(
     db: AsyncSession, chat: TelegramChat, event: NotificationEvent, body: SubscriptionUpdate
 ) -> SubscriptionOut:
+    if invalid := set(body.statuses) - valid_statuses(event):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Trạng thái không áp dụng cho '{event}': {', '.join(sorted(invalid))}",
+        )
     sub = await db.scalar(
         select(NotificationSubscription).where(
             NotificationSubscription.telegram_chat_id == chat.id, NotificationSubscription.event == event
@@ -93,7 +99,7 @@ async def _set_subscription(
         sub = NotificationSubscription(telegram_chat_id=chat.id, event=event)
         db.add(sub)
     sub.enabled = body.enabled
-    # Group nhận mọi công việc của dự án; 'mine' chỉ có nghĩa với chat cá nhân
+    # Group nhận mọi thay đổi của dự án; 'mine' chỉ có nghĩa với chat cá nhân
     sub.scope = body.scope if chat.user_id else NotificationScope.all
     sub.statuses = list(dict.fromkeys(body.statuses))
     await db.commit()
@@ -153,7 +159,9 @@ async def update_my_subscription(
 
 @me_router.post("/telegram/test", status_code=status.HTTP_204_NO_CONTENT, summary="Gửi tin thử tới Telegram của tôi")
 async def test_my_telegram(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await _send_test(db, await _my_chat(db, user), "🔔 Tin thử: bạn sẽ nhận thông báo công việc tại đây.")
+    await _send_test(
+        db, await _my_chat(db, user), "🔔 Tin thử: bạn sẽ nhận thông báo của hệ thống quản lý dự án tại đây."
+    )
 
 
 @me_router.delete("/telegram", status_code=status.HTTP_204_NO_CONTENT, summary="Ngắt kết nối Telegram của tôi")

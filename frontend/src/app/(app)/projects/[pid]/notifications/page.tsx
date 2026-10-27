@@ -65,7 +65,7 @@ export default function ProjectNotificationsPage() {
           {query.data.chats.length === 0 ? (
             <Empty
               title="Chưa có group nào"
-              description="Bấm “Thêm group Telegram”, chọn group của team — bot sẽ báo vào group mỗi khi công việc đổi trạng thái."
+              description="Bấm “Thêm group Telegram”, chọn group của team — bot sẽ báo vào group khi có công việc, giao việc, log công việc, yêu cầu khách hàng, bình luận và sprint mới hoặc thay đổi."
             />
           ) : (
             <div className="divide-y divide-line">

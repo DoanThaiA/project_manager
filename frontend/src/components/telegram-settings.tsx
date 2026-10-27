@@ -9,12 +9,104 @@ import { Button } from "@/components/ui/button";
 import { Checkbox, Select } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
-import { BOARD_COLUMNS, WORK_ITEM_STATUS } from "@/lib/labels";
-import type { MyTelegram, NotificationSubscription, TelegramChat, TelegramLink, WorkItemStatus } from "@/lib/types";
+import {
+  BOARD_COLUMNS,
+  REQUIREMENT_STATUS,
+  SPRINT_STATUS,
+  WORK_ITEM_STATUS,
+} from "@/lib/labels";
+import type {
+  MyTelegram,
+  NotificationEvent,
+  NotificationSubscription,
+  TelegramChat,
+  TelegramLink,
+} from "@/lib/types";
 import { cn, fmtDateTime } from "@/lib/utils";
 
-export const STATUS_EVENT = "work_item.status_changed";
-const FILTER_STATUSES: WorkItemStatus[] = ["backlog", ...BOARD_COLUMNS, "cancelled"];
+type Options = Record<string, { label: string }>;
+
+/** Các loại thông báo — khớp NotificationEvent / events.SPECS ở backend. */
+const EVENT_GROUPS: {
+  title: string;
+  events: {
+    event: NotificationEvent;
+    label: string;
+    personalLabel?: string;
+    /** Nhãn phạm vi "của tôi" (chat cá nhân); không có = sự kiện không phân biệt phạm vi */
+    mine?: string;
+    /** Lọc theo trạng thái mới */
+    statuses?: { options: Options; values: string[] };
+  }[];
+}[] = [
+  {
+    title: "Công việc",
+    events: [
+      {
+        event: "work_item.status_changed",
+        label: "Công việc đổi trạng thái (Sprint board, backlog)",
+        mine: "Giao cho tôi hoặc do tôi tạo",
+        statuses: {
+          options: WORK_ITEM_STATUS,
+          values: ["backlog", ...BOARD_COLUMNS, "cancelled"],
+        },
+      },
+      { event: "work_item.created", label: "Công việc mới được tạo" },
+      {
+        event: "work_item.assigned",
+        label: "Giao việc (thêm người phụ trách)",
+        personalLabel: "Tôi được giao việc",
+      },
+    ],
+  },
+  {
+    title: "Log công việc",
+    events: [
+      {
+        event: "work_log.created",
+        label: "Có log công việc mới",
+        mine: "Log trên công việc / yêu cầu của tôi",
+      },
+    ],
+  },
+  {
+    title: "Yêu cầu khách hàng",
+    events: [
+      {
+        event: "requirement.created",
+        label: "Yêu cầu mới",
+        mine: "Yêu cầu tôi phụ trách",
+      },
+      {
+        event: "requirement.status_changed",
+        label: "Yêu cầu đổi trạng thái",
+        mine: "Yêu cầu tôi phụ trách hoặc do tôi tạo",
+        statuses: {
+          options: REQUIREMENT_STATUS,
+          values: Object.keys(REQUIREMENT_STATUS),
+        },
+      },
+      {
+        event: "requirement.commented",
+        label: "Bình luận mới trên yêu cầu",
+        mine: "Yêu cầu tôi phụ trách, tạo hoặc đã bình luận",
+      },
+    ],
+  },
+  {
+    title: "Sprint",
+    events: [
+      {
+        event: "sprint.status_changed",
+        label: "Sprint bắt đầu / kết thúc / huỷ",
+        statuses: {
+          options: SPRINT_STATUS,
+          values: ["active", "completed", "cancelled"],
+        },
+      },
+    ],
+  },
+];
 
 /**
  * Mở link t.me do máy chủ tạo. Mở tab trống ngay trong lúc bấm (tránh trình chặn popup) rồi mới gán địa chỉ.
@@ -26,7 +118,10 @@ export function useTelegramLink(path: string) {
   const [waitingUntil, setWaitingUntil] = useState<number | null>(null);
   useEffect(() => {
     if (waitingUntil === null) return;
-    const timer = setTimeout(() => setWaitingUntil(null), Math.max(0, waitingUntil - Date.now()));
+    const timer = setTimeout(
+      () => setWaitingUntil(null),
+      Math.max(0, waitingUntil - Date.now()),
+    );
     return () => clearTimeout(timer);
   }, [waitingUntil]);
   const stopWaiting = useCallback(() => setWaitingUntil(null), []);
@@ -51,7 +146,7 @@ export function useTelegramLink(path: string) {
   };
 }
 
-/** Một chat đã liên kết: trạng thái, bộ lọc trạng thái công việc, gửi thử, gỡ. */
+/** Một chat đã liên kết: trạng thái, các loại thông báo nhận, gửi thử, gỡ. */
 export function TelegramChatCard({
   chat,
   personal,
@@ -67,13 +162,6 @@ export function TelegramChatCard({
   removeLabel: string;
 }) {
   const toast = useToast();
-  const sub = chat.subscriptions.find((s) => s.event === STATUS_EVENT);
-  const save = useMutation({
-    mutationFn: (body: Pick<NotificationSubscription, "enabled" | "scope" | "statuses">) =>
-      api.put(`${basePath}/subscriptions/${STATUS_EVENT}`, body),
-    onSuccess: onChanged,
-    onError: toast.error,
-  });
   const test = useMutation({
     mutationFn: () => api.post(`${basePath}/test`),
     onSuccess: () => {
@@ -91,24 +179,19 @@ export function TelegramChatCard({
     onError: toast.error,
   });
 
-  const current = {
-    enabled: sub?.enabled ?? true,
-    scope: sub?.scope ?? (personal ? "mine" : "all"),
-    statuses: sub?.statuses ?? [],
-  };
-  const update = (patch: Partial<typeof current>) => save.mutate({ ...current, ...patch });
-  const toggleStatus = (s: WorkItemStatus) =>
-    update({
-      statuses: current.statuses.includes(s) ? current.statuses.filter((x) => x !== s) : [...current.statuses, s],
-    });
-
   return (
     <div className="space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 font-medium">
-            <span className="truncate">{chat.title || (personal ? "Chat riêng" : "Group")}</span>
-            {chat.is_active ? <Badge tone="green">Đang nhận</Badge> : <Badge tone="red">Không gửi được</Badge>}
+            <span className="truncate">
+              {chat.title || (personal ? "Chat riêng" : "Group")}
+            </span>
+            {chat.is_active ? (
+              <Badge tone="green">Đang nhận</Badge>
+            ) : (
+              <Badge tone="red">Không gửi được</Badge>
+            )}
           </p>
           <p className="text-xs text-ink-3">
             {chat.is_active
@@ -119,7 +202,12 @@ export function TelegramChatCard({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" icon={<Send className="size-4" />} loading={test.isPending} onClick={() => test.mutate()}>
+          <Button
+            size="sm"
+            icon={<Send className="size-4" />}
+            loading={test.isPending}
+            onClick={() => test.mutate()}
+          >
             Gửi thử
           </Button>
           <Button
@@ -134,38 +222,111 @@ export function TelegramChatCard({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-lg bg-subtle px-4 py-3">
-        <Checkbox
-          label={<span className="font-medium text-ink">Báo khi công việc đổi trạng thái (Sprint board, backlog)</span>}
-          checked={current.enabled}
-          disabled={save.isPending}
-          onChange={(e) => update({ enabled: e.target.checked })}
-        />
-        {current.enabled && (
-          <>
-            {personal && (
-              <label className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
-                Công việc:
-                <Select
-                  className="w-auto"
-                  value={current.scope}
-                  disabled={save.isPending}
-                  onChange={(e) => update({ scope: e.target.value as typeof current.scope })}
-                >
-                  <option value="mine">Giao cho tôi hoặc do tôi tạo</option>
-                  <option value="all">Mọi công việc trong các dự án tôi tham gia</option>
-                </Select>
-              </label>
-            )}
+      <div className="divide-y divide-line rounded-lg bg-subtle">
+        {EVENT_GROUPS.map((group) => (
+          <section key={group.title} className="space-y-3 px-4 py-3">
+            <h4 className="text-xs font-semibold tracking-wide text-ink-3 uppercase">
+              {group.title}
+            </h4>
+            {group.events.map((cfg) => (
+              <EventSetting
+                key={cfg.event}
+                cfg={cfg}
+                sub={chat.subscriptions.find((s) => s.event === cfg.event)}
+                personal={personal}
+                basePath={basePath}
+                onChanged={onChanged}
+              />
+            ))}
+          </section>
+        ))}
+        <p className="px-4 py-3 text-xs text-ink-3">
+          {personal
+            ? "Không báo các thay đổi do chính bạn thực hiện; chỉ báo những gì bạn còn quyền xem trong dự án."
+            : "Nhiều thay đổi cùng loại trong một lần thao tác (vd: kết thúc sprint) được gộp thành một tin."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Bật / tắt một loại thông báo, kèm phạm vi (chat cá nhân) và lọc trạng thái. */
+function EventSetting({
+  cfg,
+  sub,
+  personal,
+  basePath,
+  onChanged,
+}: {
+  cfg: (typeof EVENT_GROUPS)[number]["events"][number];
+  sub?: NotificationSubscription;
+  personal?: boolean;
+  basePath: string;
+  onChanged: () => void;
+}) {
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: (
+      body: Pick<NotificationSubscription, "enabled" | "scope" | "statuses">,
+    ) => api.put(`${basePath}/subscriptions/${cfg.event}`, body),
+    onSuccess: onChanged,
+    onError: toast.error,
+  });
+
+  // Chưa có dòng đăng ký = chưa nhận
+  const current = {
+    enabled: sub?.enabled ?? false,
+    scope: sub?.scope ?? (personal && cfg.mine ? "mine" : "all"),
+    statuses: sub?.statuses ?? [],
+  };
+  const update = (patch: Partial<typeof current>) =>
+    save.mutate({ ...current, ...patch });
+  const toggleStatus = (s: string) =>
+    update({
+      statuses: current.statuses.includes(s)
+        ? current.statuses.filter((x) => x !== s)
+        : [...current.statuses, s],
+    });
+
+  return (
+    <div className="space-y-2">
+      <Checkbox
+        label={
+          <span className="font-medium text-ink">
+            {(personal && cfg.personalLabel) || cfg.label}
+          </span>
+        }
+        checked={current.enabled}
+        disabled={save.isPending}
+        onChange={(e) => update({ enabled: e.target.checked })}
+      />
+      {current.enabled && ((personal && cfg.mine) || cfg.statuses) && (
+        <div className="ml-6 space-y-2">
+          {personal && cfg.mine && (
+            <Select
+              aria-label="Phạm vi"
+              className="h-8 w-auto text-[13px]"
+              value={current.scope}
+              disabled={save.isPending}
+              onChange={(e) =>
+                update({ scope: e.target.value as typeof current.scope })
+              }
+            >
+              <option value="mine">{cfg.mine}</option>
+              <option value="all">Mọi thứ trong các dự án tôi tham gia</option>
+            </Select>
+          )}
+          {cfg.statuses && (
             <div>
-              <p className="mb-1.5 text-sm text-ink-2">
-                Khi chuyển sang trạng thái{" "}
-                <span className="text-ink-3">
-                  ({current.statuses.length ? "chỉ các trạng thái đã chọn" : "không chọn = mọi trạng thái"})
-                </span>
+              <p className="mb-1.5 text-xs text-ink-3">
+                Khi chuyển sang trạng thái (
+                {current.statuses.length
+                  ? "chỉ các trạng thái đã chọn"
+                  : "không chọn = mọi trạng thái"}
+                )
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {FILTER_STATUSES.map((s) => {
+                {cfg.statuses.values.map((s) => {
                   const on = current.statuses.includes(s);
                   return (
                     <button
@@ -181,20 +342,15 @@ export function TelegramChatCard({
                           : "border-line-strong text-ink-2 hover:border-brand hover:text-brand",
                       )}
                     >
-                      {WORK_ITEM_STATUS[s].label}
+                      {cfg.statuses!.options[s]?.label ?? s}
                     </button>
                   );
                 })}
               </div>
             </div>
-            <p className="text-xs text-ink-3">
-              {personal
-                ? "Không báo các thay đổi do chính bạn thực hiện."
-                : "Nhiều công việc đổi trạng thái cùng lúc (vd: kết thúc sprint) được gộp thành một tin."}
-            </p>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -203,13 +359,18 @@ export function TelegramChatCard({
 export function BotStatusBanner({ bot }: { bot: MyTelegram["bot"] }) {
   // Bot hỏi Telegram ~30 giây / lần; quá 2 phút không hỏi được là có vấn đề
   const [now] = useState(() => Date.now());
-  const stale = !bot.last_poll_at || now - new Date(bot.last_poll_at).getTime() > 2 * 60 * 1000;
+  const stale =
+    !bot.last_poll_at ||
+    now - new Date(bot.last_poll_at).getTime() > 2 * 60 * 1000;
   if (bot.running && !bot.error && !stale) return null;
   return (
     <p className="border-b border-line bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
       ⚠️ Bot chưa nhận được lệnh từ Telegram nên chưa liên kết được chat mới.{" "}
-      {bot.error ?? (bot.running ? "Đang kết nối tới Telegram…" : "Tác vụ nhận lệnh của bot không chạy.")} Xem log:{" "}
-      <code>docker compose logs api | grep -i telegram</code>
+      {bot.error ??
+        (bot.running
+          ? "Đang kết nối tới Telegram…"
+          : "Tác vụ nhận lệnh của bot không chạy.")}{" "}
+      Xem log: <code>docker compose logs api | grep -i telegram</code>
     </p>
   );
 }

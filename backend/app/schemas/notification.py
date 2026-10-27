@@ -2,21 +2,21 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.enums import NotificationEvent, NotificationScope, WorkItemStatus
+from app.models.enums import NotificationEvent, NotificationScope
 from app.schemas.common import ORMModel
 
 
 class SubscriptionOut(ORMModel):
     event: NotificationEvent
     scope: NotificationScope
-    statuses: list[WorkItemStatus]
+    statuses: list[str]  # trạng thái công việc / yêu cầu / sprint tuỳ loại sự kiện
     enabled: bool
 
 
 class SubscriptionUpdate(BaseModel):
     enabled: bool = True
     scope: NotificationScope = NotificationScope.all
-    statuses: list[WorkItemStatus] = []  # rỗng = mọi trạng thái
+    statuses: list[str] = []  # rỗng = mọi trạng thái; giá trị hợp lệ tuỳ loại sự kiện
 
 
 class TelegramChatOut(ORMModel):

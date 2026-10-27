@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import NotificationSubscription, Project, TelegramChat, TelegramLinkCode, User
 from app.models.enums import NotificationEvent, NotificationScope
 from app.services.notifications import telegram
+from app.services.notifications.events import DEFAULT_GROUP, DEFAULT_PERSONAL
 from app.services.notifications.sender import migrate_chat
 
 logger = logging.getLogger(__name__)
@@ -70,11 +71,11 @@ async def link_chat(db: AsyncSession, chat: dict, code: str) -> str:
         if chat.get("username"):
             title = f"{title} (@{chat['username']})"
         row = await _upsert(db, row, chat_id, chat_type, title, link, user_id=link.user_id)
-        await _ensure_subscription(db, row.id, NotificationScope.mine)
+        await _ensure_subscriptions(db, row.id, DEFAULT_PERSONAL, NotificationScope.mine)
         reply = (
             f"✅ Đã kết nối Telegram với tài khoản <b>{_e(user.full_name if user else '')}</b>.\n"
-            "Bạn sẽ nhận thông báo khi công việc giao cho bạn hoặc do bạn tạo được đổi trạng thái. "
-            "Đổi tuỳ chọn trong app › Thông báo của tôi."
+            "Bạn sẽ nhận thông báo khi được giao việc, khi công việc / yêu cầu của bạn đổi trạng thái, "
+            "có log công việc hoặc bình luận mới. Đổi tuỳ chọn trong app › Thông báo của tôi."
         )
     else:
         if chat_type == "private":
@@ -86,10 +87,10 @@ async def link_chat(db: AsyncSession, chat: dict, code: str) -> str:
             select(TelegramChat).where(TelegramChat.project_id == link.project_id, TelegramChat.chat_id == chat_id)
         )
         row = await _upsert(db, row, chat_id, chat_type, chat.get("title"), link, project_id=link.project_id)
-        await _ensure_subscription(db, row.id, NotificationScope.all)
+        await _ensure_subscriptions(db, row.id, DEFAULT_GROUP, NotificationScope.all)
         reply = (
-            f"✅ Group sẽ nhận thông báo của dự án <b>{_e(project.key)} · {_e(project.name)}</b> "
-            "khi công việc được đổi trạng thái."
+            f"✅ Group sẽ nhận thông báo của dự án <b>{_e(project.key)} · {_e(project.name)}</b>: "
+            "công việc, giao việc, log công việc, yêu cầu khách hàng, bình luận và sprint."
         )
     link.used_at = now
     await db.commit()
@@ -106,15 +107,18 @@ async def _upsert(db, row, chat_id, chat_type, title, link, **owner) -> Telegram
     return row
 
 
-async def _ensure_subscription(db: AsyncSession, chat_pk: int, scope: NotificationScope) -> None:
-    event = NotificationEvent.work_item_status_changed
-    exists = await db.scalar(
-        select(NotificationSubscription.id).where(
-            NotificationSubscription.telegram_chat_id == chat_pk, NotificationSubscription.event == event
+async def _ensure_subscriptions(
+    db: AsyncSession, chat_pk: int, events: list[NotificationEvent], scope: NotificationScope
+) -> None:
+    """Chat mới liên kết: bật các thông báo mặc định (giữ nguyên tuỳ chọn đã có nếu liên kết lại)."""
+    existing = set(
+        await db.scalars(
+            select(NotificationSubscription.event).where(NotificationSubscription.telegram_chat_id == chat_pk)
         )
     )
-    if not exists:
-        db.add(NotificationSubscription(telegram_chat_id=chat_pk, event=event, scope=scope, statuses=[]))
+    for event in events:
+        if event not in existing:
+            db.add(NotificationSubscription(telegram_chat_id=chat_pk, event=event, scope=scope, statuses=[]))
 
 
 async def _reply(chat_id: int, html: str) -> None:

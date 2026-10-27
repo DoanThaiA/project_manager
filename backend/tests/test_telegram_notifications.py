@@ -132,7 +132,19 @@ async def new_item(client, login, project_id, title="Việc test thông báo") -
         headers=await login("po.an"),
     )
     assert resp.status_code == 201, resp.text
+    await flush_worker()
     return resp.json()
+
+
+async def flush_worker() -> None:
+    """Gửi hết tin đang chờ rồi xoá khỏi bảng — test chỉ kiểm tra tin của bước tiếp theo."""
+    from app.db.session import AsyncSessionLocal
+    from app.models import NotificationDelivery
+
+    await run_worker()
+    async with AsyncSessionLocal() as db:
+        await db.execute(delete(NotificationDelivery))
+        await db.commit()
 
 
 async def set_status(client, login, project_id, item_id, status, user="qa.dung"):
@@ -151,11 +163,16 @@ async def test_link_and_notify_status_change(client, login, project_id, tg):
 
     me = (await client.get("/me/telegram", headers=await login("dev.cuong"))).json()
     assert me["configured"] and me["chat"]["title"] == "Cường"
-    assert me["chat"]["subscriptions"] == [
-        {"event": "work_item.status_changed", "scope": "mine", "statuses": [], "enabled": True}
+    assert [(s["event"], s["scope"]) for s in me["chat"]["subscriptions"]] == [
+        ("work_item.status_changed", "mine"),
+        ("work_item.assigned", "mine"),
+        ("work_log.created", "mine"),
+        ("requirement.status_changed", "mine"),
+        ("requirement.commented", "mine"),
     ]
 
     item = await new_item(client, login, project_id)
+    tg["sent"].clear()
     await set_status(client, login, project_id, item["id"], "in_progress")
     await run_worker()
 
@@ -169,8 +186,8 @@ async def test_link_and_notify_status_change(client, login, project_id, tg):
 
 async def test_actor_and_status_filter(client, login, project_id, tg):
     await link_chats(client, login, project_id)
-    tg["sent"].clear()
     item = await new_item(client, login, project_id)
+    tg["sent"].clear()
 
     # Người được giao tự đổi trạng thái -> không báo cho chính họ, group vẫn nhận
     await set_status(client, login, project_id, item["id"], "in_progress", user="dev.cuong")
@@ -201,9 +218,9 @@ async def test_bulk_change_is_one_message(client, login, project_id, tg):
     from app.models import User, WorkItem
 
     await link_chats(client, login, project_id)
-    tg["sent"].clear()
     a = await new_item(client, login, project_id, "Việc A <b>")
     b = await new_item(client, login, project_id, "Việc B")
+    tg["sent"].clear()
 
     # Như kết thúc sprint: nhiều công việc đổi trạng thái trong một transaction
     async with AsyncSessionLocal() as db:
@@ -276,3 +293,144 @@ async def test_invalid_code_and_permissions(client, login, project_id, tg):
     assert (await client.get(f"/projects/{project_id}/telegram", headers=dev)).status_code == 403
     assert (await client.post(f"/projects/{project_id}/telegram/link", headers=dev)).status_code == 403
     assert (await client.get(f"/projects/{project_id}/telegram", headers=await login("sm.binh"))).status_code == 200
+
+
+async def user_id(username: str) -> int:
+    from app.db.session import AsyncSessionLocal
+    from app.models import User
+
+    async with AsyncSessionLocal() as db:
+        return await db.scalar(select(User.id).where(User.username == username))
+
+
+def by_chat(sent: list[tuple[int, str]]) -> dict[int, list[str]]:
+    out: dict[int, list[str]] = {}
+    for chat, msg in sent:
+        out.setdefault(chat, []).append(msg)
+    return out
+
+
+async def test_create_and_assign(client, login, project_id, tg):
+    await link_chats(client, login, project_id)
+    tg["sent"].clear()
+    dev, qa = await user_id("dev.cuong"), await user_id("qa.dung")
+    po = await login("po.an")
+    base = f"/projects/{project_id}/work-items"
+
+    item = (await client.post(base, json={"title": "Việc mới", "assignee_ids": [dev]}, headers=po)).json()
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    # Group: tin "tạo công việc" (kèm người được giao); dev: chỉ tin "giao việc", không thêm tin "tạo"
+    assert len(sent[GROUP_CHAT]) == 1 and "🆕" in sent[GROUP_CHAT][0]
+    assert "Giao cho: Phạm Văn Cường" in sent[GROUP_CHAT][0]
+    assert len(sent[PRIVATE_CHAT]) == 1 and "đã giao việc cho <b>Phạm Văn Cường</b>" in sent[PRIVATE_CHAT][0]
+    tg["sent"].clear()
+
+    # Giao thêm qa.dung: group nhận tin giao việc (chỉ người mới), dev không nhận lại
+    resp = await client.patch(f"{base}/{item['id']}", json={"assignee_ids": [dev, qa]}, headers=po)
+    assert resp.status_code == 200, resp.text
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    assert set(sent) == {GROUP_CHAT}
+    assert "đã giao việc cho <b>Hoàng Thị Dung</b>" in sent[GROUP_CHAT][0]
+
+
+# Ngày cũ: không lẫn vào số log "của tôi" mà test_work.py kiểm tra
+OLD_DATE = "2026-09-01"
+
+
+async def test_work_log(client, login, project_id, tg):
+    await link_chats(client, login, project_id)
+    item = await new_item(client, login, project_id)  # giao cho dev.cuong
+    tg["sent"].clear()
+
+    resp = await client.post(
+        f"/projects/{project_id}/work-logs",
+        json={
+            "work_item_id": item["id"],
+            "hours": 2.5,
+            "description": "Viết API\n[Ảnh: abc/x.png]",
+            "log_date": OLD_DATE,
+        },
+        headers=await login("qa.dung"),
+    )
+    assert resp.status_code == 201, resp.text
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    assert set(sent) == {GROUP_CHAT, PRIVATE_CHAT}  # log trên việc của dev.cuong
+    msg = sent[PRIVATE_CHAT][0]
+    assert "Hoàng Thị Dung</b> đã ghi <b>2.5h</b>" in msg and item["code"] in msg
+    assert "📝 Viết API" in msg and "[Ảnh" not in msg
+    tg["sent"].clear()
+
+    # dev.cuong tự ghi log -> không báo cho chính mình
+    await client.post(
+        f"/projects/{project_id}/work-logs",
+        json={"work_item_id": item["id"], "hours": 1, "description": "Sửa lỗi", "log_date": OLD_DATE},
+        headers=await login("dev.cuong"),
+    )
+    await run_worker()
+    assert [c for c, _ in tg["sent"]] == [GROUP_CHAT]
+
+
+async def test_requirement_and_comments(client, login, project_id, tg):
+    await link_chats(client, login, project_id)
+    tg["sent"].clear()
+    po = await login("po.an")
+    base = f"/projects/{project_id}/requirements"
+
+    body = {"title": "Báo cáo tồn kho", "assignee_id": await user_id("dev.cuong")}
+    req = (await client.post(base, json=body, headers=po)).json()
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    assert set(sent) == {GROUP_CHAT}  # cá nhân mặc định không nhận "yêu cầu mới"
+    assert "Yêu cầu mới <b>" in sent[GROUP_CHAT][0] and req["code"] in sent[GROUP_CHAT][0]
+    tg["sent"].clear()
+
+    resp = await client.post(f"{base}/{req['id']}/status", json={"status": "analyzing"}, headers=po)
+    assert resp.status_code == 200, resp.text
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    assert set(sent) == {GROUP_CHAT, PRIVATE_CHAT}  # dev.cuong phụ trách yêu cầu
+    assert "Mới → <b>Đang phân tích</b>" in sent[PRIVATE_CHAT][0]
+    tg["sent"].clear()
+
+    resp = await client.post(
+        f"{base}/{req['id']}/comments", json={"content": "Cần thêm cột giá vốn", "is_internal": True}, headers=po
+    )
+    assert resp.status_code == 201, resp.text
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    assert set(sent) == {GROUP_CHAT, PRIVATE_CHAT}
+    assert "đã bình luận yêu cầu" in sent[PRIVATE_CHAT][0] and "🔒 Nội bộ" in sent[PRIVATE_CHAT][0]
+    assert "«Cần thêm cột giá vốn»" in sent[PRIVATE_CHAT][0]
+
+
+async def test_subscription_statuses_validated(client, login, project_id, tg):
+    await link_chats(client, login, project_id)
+    dev = await login("dev.cuong")
+    url = "/me/telegram/subscriptions/requirement.status_changed"
+    assert (await client.put(url, json={"statuses": ["approved"]}, headers=dev)).status_code == 200
+    assert (await client.put(url, json={"statuses": ["testing"]}, headers=dev)).status_code == 422
+    url = "/me/telegram/subscriptions/work_log.created"
+    assert (await client.put(url, json={"statuses": ["done"]}, headers=dev)).status_code == 422
+
+
+async def test_sprint_status(client, login, project_id, tg):
+    """Chạy cuối: kết thúc sprint 1 của dự án test."""
+    from app.db.session import AsyncSessionLocal
+    from app.models import Sprint
+
+    await link_chats(client, login, project_id)
+    tg["sent"].clear()
+    async with AsyncSessionLocal() as db:
+        sprint_id = await db.scalar(select(Sprint.id).where(Sprint.project_id == project_id, Sprint.sprint_no == 1))
+    resp = await client.post(
+        f"/projects/{project_id}/sprints/{sprint_id}/complete", json={}, headers=await login("sm.binh")
+    )
+    assert resp.status_code == 200, resp.text
+    await run_worker()
+    sent = by_chat(tg["sent"])
+    assert any("Lê Thị Bình</b> đã kết thúc <b>Sprint 1</b>" in m for m in sent[GROUP_CHAT])
+    # Cá nhân mặc định không nhận tin sprint; việc của dev.cuong về backlog thì vẫn báo đổi trạng thái
+    assert all("Sprint 1</b>" not in m for m in sent.get(PRIVATE_CHAT, []))

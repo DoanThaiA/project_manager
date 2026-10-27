@@ -1536,7 +1536,7 @@ export interface components {
          * @description Loại sự kiện gửi thông báo Telegram.
          * @enum {string}
          */
-        NotificationEvent: "work_item.status_changed";
+        NotificationEvent: "work_item.status_changed" | "work_item.created" | "work_item.assigned" | "work_log.created" | "requirement.created" | "requirement.status_changed" | "requirement.commented" | "sprint.status_changed";
         /**
          * NotificationScope
          * @enum {string}
@@ -2227,7 +2227,7 @@ export interface components {
             event: components["schemas"]["NotificationEvent"];
             scope: components["schemas"]["NotificationScope"];
             /** Statuses */
-            statuses: components["schemas"]["WorkItemStatus"][];
+            statuses: string[];
             /** Enabled */
             enabled: boolean;
         };
@@ -2244,7 +2244,7 @@ export interface components {
              * Statuses
              * @default []
              */
-            statuses: components["schemas"]["WorkItemStatus"][];
+            statuses: string[];
         };
         /** TelegramChatOut */
         TelegramChatOut: {

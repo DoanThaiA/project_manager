@@ -127,8 +127,15 @@ class NotificationEvent(StrEnum):
     """Loại sự kiện gửi thông báo Telegram."""
 
     work_item_status_changed = "work_item.status_changed"
+    work_item_created = "work_item.created"
+    work_item_assigned = "work_item.assigned"
+    work_log_created = "work_log.created"
+    requirement_created = "requirement.created"
+    requirement_status_changed = "requirement.status_changed"
+    requirement_commented = "requirement.commented"
+    sprint_status_changed = "sprint.status_changed"
 
 
 class NotificationScope(StrEnum):
-    all = "all"  # group: mọi công việc của dự án; cá nhân: mọi công việc trong các dự án mình tham gia
-    mine = "mine"  # cá nhân: chỉ việc giao cho mình / mình tạo
+    all = "all"  # group: mọi thay đổi của dự án; cá nhân: mọi thay đổi trong các dự án mình tham gia
+    mine = "mine"  # cá nhân: chỉ việc / yêu cầu giao cho mình, mình tạo (hoặc mình đã bình luận)

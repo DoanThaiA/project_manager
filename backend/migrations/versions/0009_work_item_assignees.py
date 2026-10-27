@@ -24,9 +24,7 @@ def upgrade() -> None:
     op.execute("UPDATE work_items SET assignee_ids = ARRAY[assignee_id] WHERE assignee_id IS NOT NULL")
     op.execute("DROP INDEX IF EXISTS idx_work_items_assignee")
     op.execute("ALTER TABLE work_items DROP COLUMN assignee_id")
-    op.execute(
-        "CREATE INDEX idx_work_items_assignees ON work_items USING gin (assignee_ids) WHERE deleted_at IS NULL"
-    )
+    op.execute("CREATE INDEX idx_work_items_assignees ON work_items USING gin (assignee_ids) WHERE deleted_at IS NULL")
     op.execute("COMMENT ON COLUMN work_items.assignee_ids IS 'Người phụ trách (nhiều người), id users'")
 
 
@@ -39,6 +37,4 @@ def downgrade() -> None:
         "WHERE cardinality(w.assignee_ids) > 0 AND EXISTS (SELECT 1 FROM users u WHERE u.id = w.assignee_ids[1])"
     )
     op.execute("ALTER TABLE work_items DROP COLUMN assignee_ids")
-    op.execute(
-        "CREATE INDEX idx_work_items_assignee ON work_items(assignee_id, status) WHERE deleted_at IS NULL"
-    )
+    op.execute("CREATE INDEX idx_work_items_assignee ON work_items(assignee_id, status) WHERE deleted_at IS NULL")

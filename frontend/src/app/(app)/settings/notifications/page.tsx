@@ -33,7 +33,7 @@ export default function MyNotificationsPage() {
     <>
       <PageHeader
         title="Thông báo Telegram"
-        description="Nhận tin trên Telegram khi công việc liên quan tới bạn được đổi trạng thái."
+        description="Nhận tin trên Telegram khi được giao việc, khi công việc / yêu cầu liên quan tới bạn thay đổi, có log công việc hoặc bình luận mới."
       />
       <Card className="max-w-3xl">
         <CardHeader

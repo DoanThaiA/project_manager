@@ -146,8 +146,19 @@ Gói miễn phí giới hạn ảnh 1 MB (`OCR_MAX_KB`); trình duyệt tự thu
 
 ## 10. Thông báo Telegram
 
-Khi công việc được đổi trạng thái (kéo thả trên Sprint board, sửa công việc, bắt đầu / kết thúc sprint), bot gửi
-tin tới **group của dự án** và **chat riêng** của người liên quan. Bot nhận lệnh bằng long polling — không cần
+Bot gửi tin tới **group của dự án** và **chat riêng** của người liên quan khi có:
+
+| Loại | Khi nào |
+|---|---|
+| Công việc đổi trạng thái | kéo thả trên Sprint board, sửa công việc, kết thúc sprint |
+| Công việc mới | tạo công việc / subtask |
+| Giao việc | thêm người phụ trách (người được giao nhận tin riêng) |
+| Log công việc mới | ai đó ghi log giờ |
+| Yêu cầu mới / đổi trạng thái | yêu cầu khách hàng |
+| Bình luận mới | bình luận trên yêu cầu (bình luận nội bộ chỉ gửi người có quyền xem nội bộ) |
+| Sprint | bắt đầu / kết thúc / huỷ sprint |
+
+Mỗi chat bật / tắt từng loại ở trang *Thông báo* (cá nhân hoặc của dự án). Bot nhận lệnh bằng long polling — không cần
 webhook, không cần mở port; container API chỉ cần gọi ra được `https://api.telegram.org`.
 
 1. Trên Telegram, chat với [@BotFather](https://t.me/BotFather):
@@ -158,13 +169,15 @@ webhook, không cần mở port; container API chỉ cần gọi ra được `ht
    `docker compose up -d --build api` (API tự chạy migration 0005).
 3. Liên kết chat (token không bao giờ lộ ra trình duyệt; mã liên kết dùng một lần, hết hạn sau 15 phút):
    - **Cá nhân**: menu tài khoản › *Thông báo Telegram* › *Kết nối Telegram* → Telegram mở chat với bot → bấm
-     **Start**. Mặc định nhận thông báo khi việc *giao cho mình* hoặc *do mình tạo* đổi trạng thái (không báo
-     thay đổi do chính mình làm).
+     **Start**. Mặc định nhận: được giao việc; công việc / yêu cầu *của mình* (giao cho mình, mình tạo) đổi trạng
+     thái; log công việc trên việc của mình; bình luận trên yêu cầu mình phụ trách / tạo / đã bình luận. Không báo
+     thay đổi do chính mình làm, và chỉ báo những gì mình còn quyền xem.
    - **Group**: dự án › *Thông báo* › *Thêm group Telegram* → chọn group → bot vào group và tự liên kết. Cần
-     quyền `project.notification.manage` (mặc định: Product Owner, Scrum Master). Có thể lọc chỉ báo khi chuyển
-     sang một số trạng thái (vd chỉ *Review*, *Xong*).
+     quyền `project.notification.manage` (mặc định: Product Owner, Scrum Master). Group nhận tất cả các loại;
+     có thể lọc chỉ báo khi chuyển sang một số trạng thái (vd chỉ *Review*, *Xong*).
+   - Chat đã liên kết trước migration 0010 được bật sẵn các loại mới theo mặc định trên.
 
-Nhiều công việc đổi trạng thái trong cùng một thao tác (vd kết thúc sprint) được gộp thành một tin. Telegram lỗi
+Nhiều thay đổi cùng loại trong cùng một thao tác (vd kết thúc sprint) được gộp thành một tin. Telegram lỗi
 thì tin được gửi lại (30 giây → 1 giờ, tối đa 5 lần); bot bị xoá khỏi group / bị chặn thì chat đó ngừng nhận
 cho tới khi liên kết lại hoặc bấm *Gửi thử* thành công. Xem lỗi: `docker compose logs -f api | grep -i telegram`.
 

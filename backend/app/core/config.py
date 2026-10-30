@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     telegram_poll_seconds: float = 5  # chu kỳ worker xử lý hàng đợi thông báo
     app_public_url: str = "http://localhost:3000"  # để chèn link mở công việc vào tin nhắn
 
+    # MCP server cho ban lãnh đạo (kết nối bằng connector URL, xem docs/MCP.md)
+    mcp_api_url: str = "http://localhost:8000/api/v1"  # API nội bộ mà MCP server gọi tới
+    mcp_port: int = 8001
+    mcp_public_base_url: str = "https://dev.mcv.network"  # domain HTTPS công khai, dùng để in URL connector
+    mcp_rate_limit_per_minute: int = 120  # theo mỗi connector
+    mcp_token_cache_seconds: int = 60  # cache kết quả kiểm tra token hợp lệ
+
 
 @lru_cache
 def get_settings() -> Settings:

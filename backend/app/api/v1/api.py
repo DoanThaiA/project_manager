@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    api_tokens,
     attachments,
     auth,
     customers,
@@ -21,6 +22,7 @@ api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["Xác thực"])
 api_router.include_router(work_logs.me_router, prefix="/me", tags=["Cá nhân"])
 api_router.include_router(notifications.me_router, prefix="/me", tags=["Thông báo Telegram"])
+api_router.include_router(api_tokens.router, prefix="/me", tags=["Token truy cập"])
 api_router.include_router(users.router, prefix="/users", tags=["Người dùng"])
 api_router.include_router(roles.router, tags=["Vai trò & chức năng"])
 api_router.include_router(customers.router, prefix="/customers", tags=["Khách hàng"])

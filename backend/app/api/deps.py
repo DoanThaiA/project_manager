@@ -1,14 +1,15 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import decode_access_token
+from app.core.security import PAT_PREFIX, decode_access_token, hash_api_token
 from app.db.session import get_db
-from app.models import Permission, Project, User
+from app.models import ApiToken, Permission, Project, User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -18,6 +19,26 @@ def client_ip(request: Request) -> str | None:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else None
+
+
+async def user_from_api_token(db: AsyncSession, token: str) -> User | None:
+    """Người dùng sở hữu PAT còn hạn và chưa bị thu hồi. Ghi last_used_at, tối đa 1 lần / 5 phút."""
+    row = await db.scalar(
+        select(ApiToken).where(
+            ApiToken.token_hash == hash_api_token(token),
+            ApiToken.revoked_at.is_(None),
+            ApiToken.expires_at > func.now(),
+        )
+    )
+    if row is None:
+        return None
+    await db.execute(
+        update(ApiToken)
+        .where(ApiToken.id == row.id, ApiToken.last_used_at < func.now() - timedelta(minutes=5))
+        .values(last_used_at=func.now())
+    )
+    await db.commit()
+    return await db.get(User, row.user_id)
 
 
 async def get_current_user(
@@ -31,15 +52,18 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    payload = decode_access_token(token)
-    if payload is None or (sub := payload.get("sub")) is None:
-        raise credentials_exception
-    try:
-        user_id = int(sub)
-    except ValueError as exc:
-        raise credentials_exception from exc
+    if token.startswith(PAT_PREFIX):
+        user = await user_from_api_token(db, token)
+    else:
+        payload = decode_access_token(token)
+        if payload is None or (sub := payload.get("sub")) is None:
+            raise credentials_exception
+        try:
+            user_id = int(sub)
+        except ValueError as exc:
+            raise credentials_exception from exc
+        user = await db.get(User, user_id)
 
-    user = await db.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise credentials_exception
     if not user.is_active:

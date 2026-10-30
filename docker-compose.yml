@@ -24,11 +24,28 @@ services:
       # Thông báo Telegram: bot nhận lệnh bằng long polling nên chỉ cần gọi ra được api.telegram.org
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
+      # Domain HTTPS để lệnh issue-mcp-url in đúng URL connector (xem docs/MCP.md)
+      MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-https://dev.mcv.network}
     ports:
       - "${PM_BIND_ADDR:-0.0.0.0}:${PM_API_PORT:-8000}:8000"
     networks:
       - default
       - shared-db
+
+  # MCP server cho ban lãnh đạo (connector URL, xem docs/MCP.md). Chỉ lắng nghe 127.0.0.1: nginx chuyển /mcp/ tới đây
+  mcp:
+    build: ./backend
+    container_name: project_manager_mcp
+    restart: unless-stopped
+    command: ["python", "-m", "app.mcp_server"]
+    environment:
+      MCP_API_URL: http://api:8000/api/v1
+      MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-https://dev.mcv.network}
+      MCP_RATE_LIMIT_PER_MINUTE: ${MCP_RATE_LIMIT_PER_MINUTE:-120}
+    ports:
+      - "127.0.0.1:${PM_MCP_PORT:-8100}:8001"
+    depends_on:
+      - api
 
   web:
     build:

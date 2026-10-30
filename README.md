@@ -26,7 +26,7 @@ cp .env.example .env            # điền PM_DB_PASSWORD, SECRET_KEY (giá trị
 ./scripts/init_db.sh --demo     # tạo user + database, chạy migration Alembic (+ dữ liệu mẫu)
 ```
 
-Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
+Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Kết nối AI (MCP, connector URL) cho ban lãnh đạo: xem [docs/MCP.md](docs/MCP.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
 `docker compose exec api python -m app.cli create-admin --username admin --email … --full-name "…"`
 
 Script không xoá dữ liệu có sẵn; dữ liệu mẫu chỉ nạp khi database còn trống.

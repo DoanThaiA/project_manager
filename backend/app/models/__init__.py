@@ -1,3 +1,4 @@
+from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
 from app.models.customer import Customer, CustomerContact
 from app.models.notification import (
@@ -13,6 +14,7 @@ from app.models.work import ActivityLog, WorkItem, WorkLog
 
 __all__ = [
     "ActivityLog",
+    "ApiToken",
     "Attachment",
     "Customer",
     "CustomerContact",

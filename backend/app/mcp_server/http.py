@@ -9,8 +9,10 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
+from urllib.parse import urlparse
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 
 from app.core.config import settings
 from app.core.security import hash_api_token
@@ -40,8 +42,21 @@ class ConnectorApp:
         server: MCPServer[Any],
         validate: Callable[[str], Awaitable[bool]],
         rate_limit_per_minute: int,
+        public_host: str,
     ) -> None:
-        self._inner = server.streamable_http_app(streamable_http_path="/mcp", stateless_http=True, json_response=True)
+        # Host header là domain công khai (nginx truyền $host) hoặc localhost khi chạy thử.
+        # Không có host này SDK từ chối request với 421 "Invalid Host header".
+        security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[public_host, "localhost:*", "127.0.0.1:*"],
+            allowed_origins=[f"https://{public_host}", "http://localhost:*", "http://127.0.0.1:*"],
+        )
+        self._inner = server.streamable_http_app(
+            streamable_http_path="/mcp",
+            stateless_http=True,
+            json_response=True,
+            transport_security=security,
+        )
         self._validate = validate
         self._limit = rate_limit_per_minute
         self._hits: dict[str, deque[float]] = {}
@@ -91,4 +106,5 @@ class ConnectorApp:
 
 
 def build_app() -> ConnectorApp:
-    return ConnectorApp(mcp, client.token_is_valid, settings.mcp_rate_limit_per_minute)
+    public_host = urlparse(settings.mcp_public_base_url).netloc
+    return ConnectorApp(mcp, client.token_is_valid, settings.mcp_rate_limit_per_minute, public_host)

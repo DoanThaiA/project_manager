@@ -17,7 +17,7 @@ async def _never(_token: str) -> bool:
     return False
 
 
-async def _call(app: ConnectorApp, path: str) -> tuple[int, bytes]:
+async def _call(app: ConnectorApp, path: str, method: str = "POST") -> tuple[int, bytes]:
     """Gọi ASGI trực tiếp, trả về (mã HTTP, nội dung)."""
     sent: list[dict[str, Any]] = []
 
@@ -27,7 +27,7 @@ async def _call(app: ConnectorApp, path: str) -> tuple[int, bytes]:
     async def send(message):
         sent.append(message)
 
-    scope = {"type": "http", "method": "GET", "path": path, "raw_path": path.encode(), "headers": []}
+    scope = {"type": "http", "method": method, "path": path, "raw_path": path.encode(), "headers": []}
     await app(scope, receive, send)
     status = next(m["status"] for m in sent if m["type"] == "http.response.start")
     body = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
@@ -68,6 +68,12 @@ async def test_wrong_secret_returns_404_without_hint(monkeypatch):
 async def test_healthz_is_public():
     app = ConnectorApp(mcp, _never, rate_limit_per_minute=10)
     assert await _call(app, "/healthz") == (200, b"ok")
+
+
+async def test_get_stream_is_refused_quickly():
+    """Không mở luồng SSE (proxy sẽ cắt sau vài phút): GET trả 405 ngay."""
+    app = ConnectorApp(mcp, _always, rate_limit_per_minute=10)
+    assert await _call(app, "/mcp/valid-looking-token", method="GET") == (405, b"Method Not Allowed")
 
 
 async def test_rate_limit_applies_per_connector():

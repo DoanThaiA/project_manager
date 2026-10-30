@@ -26,14 +26,9 @@ NOT_FOUND = b"Not Found"
 WINDOW_SECONDS = 60
 
 
-async def _respond(send: Send, status: int, body: bytes) -> None:
-    await send(
-        {
-            "type": "http.response.start",
-            "status": status,
-            "headers": [(b"content-type", b"text/plain; charset=utf-8"), (b"content-length", str(len(body)).encode())],
-        }
-    )
+async def _respond(send: Send, status: int, body: bytes, extra: list[tuple[bytes, bytes]] | None = None) -> None:
+    headers = [(b"content-type", b"text/plain; charset=utf-8"), (b"content-length", str(len(body)).encode())]
+    await send({"type": "http.response.start", "status": status, "headers": headers + (extra or [])})
     await send({"type": "http.response.body", "body": body})
 
 
@@ -78,6 +73,11 @@ class ConnectorApp:
         token = match.group(1)
         if not await self._validate(token):
             await _respond(send, 404, NOT_FOUND)
+            return
+        if scope["method"] == "GET":
+            # Server không gửi thông báo chủ động tới client, nên không mở luồng SSE (luồng này sẽ bị proxy cắt).
+            # MCP spec cho phép trả 405 trong trường hợp này.
+            await _respond(send, 405, b"Method Not Allowed", [(b"allow", b"POST, DELETE")])
             return
         if not self._allow(hash_api_token(token)):
             await _respond(send, 429, b"Too Many Requests")

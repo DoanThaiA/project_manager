@@ -95,6 +95,7 @@ Frontend chạy phía client sau đăng nhập (JWT trong localStorage). Ẩn/hi
 | `…/backlog` | Product Backlog + sprint: kéo thả lập kế hoạch, sắp xếp ưu tiên, tạo/bắt đầu sprint |
 | `…/board` | Sprint board Kanban kéo thả, kết thúc sprint (review/retro) |
 | `…/work-logs` | Log công việc, tổng hợp theo người/ngày/loại/sprint |
+| `…/crm` | CRM: khách liên hệ qua Gmail (n8n gửi về), trạng thái theo dõi, người phụ trách, ghi chú, các email đã nhận |
 | `…/members`, `…/activity` | Thành viên & vai trò, nhật ký thay đổi |
 | `/timesheet` | Bảng giờ theo tuần của tôi |
 | `/customers` | Khách hàng & người liên hệ |
@@ -115,6 +116,7 @@ Xác thực bằng JWT Bearer: `POST /auth/login` (form `username`, `password`) 
 | Yêu cầu KH | `/projects/{pid}/requirements`, `POST …/{rid}/status`, `GET …/{rid}/history`, `GET …/{rid}/activity`, `…/{rid}/comments` |
 | Backlog | `/projects/{pid}/work-items` (lọc `backlog=true`, `sprint_id`, `status`, `assignee_id` = công việc có người này trong danh sách phụ trách…) |
 | Log công việc | `/projects/{pid}/work-logs`, `GET /me/work-logs` |
+| CRM | `POST /projects/{pid}/crm/emails/ingest` (n8n), `GET /projects/{pid}/crm/stats`, `/projects/{pid}/crm/contacts`, `GET/PATCH/DELETE …/contacts/{id}`, `GET /projects/{pid}/crm/emails` (lọc `contact_id`, `inquiry_type`, ngày), `GET/DELETE …/emails/{id}` |
 | Báo cáo & nhật ký | `GET /projects/{pid}/reports/summary`, `GET /projects/{pid}/reports/work-logs?group_by=user\|date\|activity_type\|work_item\|sprint`, `GET /projects/{pid}/activity-logs`, `GET /activity-logs` |
 
 ### Quy tắc nghiệp vụ chính
@@ -125,6 +127,10 @@ Xác thực bằng JWT Bearer: `POST /auth/login` (form `username`, `password`) 
 - Bình luận `is_internal` bị ẩn với người không có quyền `requirement.view_internal` (vd: khách hàng).
 - Log công việc: không log ngày tương lai, tổng ≤ 24h/ngày/người, tự trừ `remaining_hours` của công việc, tự gắn sprint; chỉ sửa/xoá log của mình trừ khi có `work_log.manage`.
 - Kết thúc sprint: việc chưa xong chuyển về backlog hoặc sang sprint kế tiếp.
+- **CRM**: n8n gọi `POST /projects/{pid}/crm/emails/ingest` (body giống bảng `kpacking_email_leads`) với header
+  `Authorization: Bearer <PAT>` — token truy cập của tài khoản có quyền `crm.create` trong dự án (vd: tài khoản bot là
+  PO/BA của dự án). Trùng `email_message_id` thì bỏ qua (`created: false`); email gộp vào khách theo `customer_email`,
+  chỉ điền các trường khách còn trống, không ghi đè thông tin đã sửa tay. `inquiry_type` lạ → `khac`.
 - **Audit**: mỗi transaction đặt `app.current_user_id` / `app.client_ip` (xem `app/db/session.py`), trigger DB ghi `activity_logs` với giá trị cũ/mới. Đăng nhập, đăng nhập thất bại cũng được ghi.
 
 Tài liệu thiết kế database: [docs/DATABASE.md](docs/DATABASE.md)

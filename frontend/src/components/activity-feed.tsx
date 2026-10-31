@@ -3,6 +3,7 @@ import { Avatar } from "@/components/ui/misc";
 import {
   type Tone,
   ACTION_LABEL,
+  CRM_STATUS,
   ENTITY_LABEL,
   FIELD_LABEL,
   PROJECT_STATUS,
@@ -21,6 +22,7 @@ const STATUS_META: Record<string, Record<string, { label: string; tone: Tone }>>
   work_items: WORK_ITEM_STATUS,
   sprints: SPRINT_STATUS,
   projects: PROJECT_STATUS,
+  crm_contacts: CRM_STATUS,
 };
 
 /** Đổi id sang tên hiển thị (người dùng, sprint, vai trò…); trả undefined nếu không biết. */

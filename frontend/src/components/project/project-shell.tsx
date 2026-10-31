@@ -17,6 +17,7 @@ const TABS = [
   { slug: "backlog", label: "Backlog", perm: "work_item.view" },
   { slug: "board", label: "Sprint board", perm: "work_item.view" },
   { slug: "work-logs", label: "Log công việc", perm: "work_log.view" },
+  { slug: "crm", label: "CRM", perm: "crm.view" },
   { slug: "members", label: "Thành viên" },
   { slug: "activity", label: "Nhật ký", perm: "activity_log.view" },
   { slug: "notifications", label: "Thông báo", perm: "project.notification.manage" },

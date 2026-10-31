@@ -1,5 +1,6 @@
 from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
+from app.models.crm import CrmContact, CrmEmailLead
 from app.models.customer import Customer, CustomerContact
 from app.models.notification import (
     NotificationDelivery,
@@ -16,6 +17,8 @@ __all__ = [
     "ActivityLog",
     "ApiToken",
     "Attachment",
+    "CrmContact",
+    "CrmEmailLead",
     "Customer",
     "CustomerContact",
     "NotificationDelivery",

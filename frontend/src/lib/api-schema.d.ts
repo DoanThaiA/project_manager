@@ -158,6 +158,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/api-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách token của tôi */
+        get: operations["list_api_tokens_api_v1_me_api_tokens_get"];
+        put?: never;
+        /** Tạo token truy cập */
+        post: operations["create_api_token_api_v1_me_api_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/api-tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Thu hồi token */
+        delete: operations["revoke_api_token_api_v1_me_api_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -1039,6 +1074,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/crm/emails/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * n8n gửi 1 email khách liên hệ (trùng email_message_id thì bỏ qua)
+         * @description Gộp vào khách liên hệ theo `customer_email` (tạo mới nếu chưa có; chỉ điền các trường còn trống). Gọi bằng token truy cập (PAT) của tài khoản có quyền `crm.create` trong dự án.
+         */
+        post: operations["ingest_email_api_v1_projects__project_id__crm_emails_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/crm/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số khách theo trạng thái, email 7 ngày qua */
+        get: operations["crm_stats_api_v1_projects__project_id__crm_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/crm/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Contacts */
+        get: operations["list_contacts_api_v1_projects__project_id__crm_contacts_get"];
+        put?: never;
+        /** Thêm khách tay */
+        post: operations["create_contact_api_v1_projects__project_id__crm_contacts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/crm/contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Contact */
+        get: operations["get_contact_api_v1_projects__project_id__crm_contacts__contact_id__get"];
+        put?: never;
+        post?: never;
+        /** Xoá khách liên hệ (kèm toàn bộ email của khách) */
+        delete: operations["delete_contact_api_v1_projects__project_id__crm_contacts__contact_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Contact */
+        patch: operations["update_contact_api_v1_projects__project_id__crm_contacts__contact_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/crm/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Emails */
+        get: operations["list_emails_api_v1_projects__project_id__crm_emails_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/crm/emails/{lead_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Email */
+        get: operations["get_email_api_v1_projects__project_id__crm_emails__lead_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Email */
+        delete: operations["delete_email_api_v1_projects__project_id__crm_emails__lead_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/reports/summary": {
         parameters: {
             query?: never;
@@ -1144,6 +1288,63 @@ export interface components {
             ip_address?: unknown | null;
             /** Message */
             message: string | null;
+        };
+        /** ApiTokenCreate */
+        ApiTokenCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Expires Days
+             * @default 90
+             */
+            expires_days: number;
+        };
+        /** ApiTokenCreated */
+        ApiTokenCreated: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Token
+             * @description Chỉ hiện một lần, không lưu lại được
+             */
+            token: string;
+        };
+        /** ApiTokenOut */
+        ApiTokenOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * AttachmentCategory
@@ -1365,6 +1566,260 @@ export interface components {
             /** Is Primary */
             is_primary?: boolean | null;
         };
+        /** CrmContactCreate */
+        CrmContactCreate: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Full Name */
+            full_name?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Company */
+            company?: string | null;
+            /** Address */
+            address?: string | null;
+            /** @default new */
+            status: components["schemas"]["CrmContactStatus"];
+            /** Assignee Id */
+            assignee_id?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** CrmContactOut */
+        CrmContactOut: {
+            /** Id */
+            id: number;
+            /** Project Id */
+            project_id: number;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string | null;
+            /** Contact Email */
+            contact_email: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Company */
+            company: string | null;
+            /** Address */
+            address: string | null;
+            status: components["schemas"]["CrmContactStatus"];
+            /** Assignee Id */
+            assignee_id: number | null;
+            /** Note */
+            note: string | null;
+            /** Source */
+            source: string;
+            /** Created By */
+            created_by: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Email Count
+             * @description Số email đã nhận
+             * @default 0
+             */
+            email_count: number;
+            /**
+             * Last Contact At
+             * @description Thời điểm email gần nhất
+             */
+            last_contact_at?: string | null;
+            /** @description Loại nhu cầu của email gần nhất */
+            last_inquiry_type?: components["schemas"]["CrmInquiryType"] | null;
+        };
+        /**
+         * CrmContactStatus
+         * @description Trạng thái theo dõi khách liên hệ CRM (cột crm_contacts.status, CHECK constraint).
+         * @enum {string}
+         */
+        CrmContactStatus: "new" | "contacted" | "quoted" | "negotiating" | "won" | "lost" | "spam";
+        /** CrmContactUpdate */
+        CrmContactUpdate: {
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Company */
+            company?: string | null;
+            /** Address */
+            address?: string | null;
+            status?: components["schemas"]["CrmContactStatus"] | null;
+            /** Assignee Id */
+            assignee_id?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * CrmEmailIngest
+         * @description Payload n8n gửi sang: 1 email khách liên hệ (tên trường giống bảng kpacking_email_leads).
+         */
+        CrmEmailIngest: {
+            /**
+             * Email Message Id
+             * @description Mã email Gmail, chống trùng
+             */
+            email_message_id: string;
+            /** Email Thread Id */
+            email_thread_id?: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             * @description ISO 8601; không có múi giờ thì coi là giờ Việt Nam
+             */
+            received_at: string;
+            /** Subject */
+            subject?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            /**
+             * Customer Email
+             * Format: email
+             * @description Email người gửi (header Gmail)
+             */
+            customer_email: string;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Company */
+            company?: string | null;
+            /** Address */
+            address?: string | null;
+            /** @default khac */
+            inquiry_type: components["schemas"]["CrmInquiryType"];
+            /** Product Type */
+            product_type?: string | null;
+            /** Quantity */
+            quantity?: string | null;
+            /** Specifications */
+            specifications?: string | null;
+            /** Budget */
+            budget?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Ai Confidence */
+            ai_confidence?: number | string | null;
+            /**
+             * Source
+             * @default gmail
+             */
+            source: string;
+        };
+        /** CrmEmailLeadOut */
+        CrmEmailLeadOut: {
+            /** Id */
+            id: number;
+            /** Project Id */
+            project_id: number;
+            /** Contact Id */
+            contact_id: number;
+            /** Email Message Id */
+            email_message_id: string;
+            /** Email Thread Id */
+            email_thread_id: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Subject */
+            subject: string | null;
+            /** Content */
+            content: string | null;
+            /** Customer Name */
+            customer_name: string | null;
+            /** Customer Email */
+            customer_email: string;
+            /** Contact Email */
+            contact_email: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Company */
+            company: string | null;
+            /** Address */
+            address: string | null;
+            inquiry_type: components["schemas"]["CrmInquiryType"];
+            /** Product Type */
+            product_type: string | null;
+            /** Quantity */
+            quantity: string | null;
+            /** Specifications */
+            specifications: string | null;
+            /** Budget */
+            budget: string | null;
+            /** Deadline */
+            deadline: string | null;
+            /** Summary */
+            summary: string | null;
+            /** Ai Confidence */
+            ai_confidence: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CrmIngestOut */
+        CrmIngestOut: {
+            /** Lead Id */
+            lead_id: number;
+            /** Contact Id */
+            contact_id: number;
+            /**
+             * Created
+             * @description false = email đã nhận trước đó (n8n gửi lại), không tạo mới
+             */
+            created: boolean;
+        };
+        /**
+         * CrmInquiryType
+         * @description Loại nhu cầu trong email (cột crm_email_leads.inquiry_type, CHECK constraint) - giá trị n8n gửi sang.
+         * @enum {string}
+         */
+        CrmInquiryType: "dat_hang" | "bao_gia" | "hoi_thong_tin" | "khac";
+        /** CrmStats */
+        CrmStats: {
+            /** Total */
+            total: number;
+            /** By Status */
+            by_status: {
+                [key: string]: number;
+            };
+            /**
+             * Emails 7D
+             * @description Số email nhận trong 7 ngày qua
+             */
+            emails_7d: number;
+            /**
+             * Unassigned
+             * @description Khách đang mở (chưa chốt / không thành / spam) chưa có người phụ trách
+             */
+            unassigned: number;
+        };
         /** CustomerCreate */
         CustomerCreate: {
             /** Name */
@@ -1546,6 +2001,28 @@ export interface components {
         Page_ActivityLogOut_: {
             /** Items */
             items: components["schemas"]["ActivityLogOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /** Page[CrmContactOut] */
+        Page_CrmContactOut_: {
+            /** Items */
+            items: components["schemas"]["CrmContactOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /** Page[CrmEmailLeadOut] */
+        Page_CrmEmailLeadOut_: {
+            /** Items */
+            items: components["schemas"]["CrmEmailLeadOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -2950,6 +3427,88 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_api_tokens_api_v1_me_api_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenOut"][];
+                };
+            };
+        };
+    };
+    create_api_token_api_v1_me_api_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiTokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_token_api_v1_me_api_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
@@ -5625,6 +6184,350 @@ export interface operations {
             header?: never;
             path: {
                 chat_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_email_api_v1_projects__project_id__crm_emails_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrmEmailIngest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrmIngestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crm_stats_api_v1_projects__project_id__crm_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrmStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_contacts_api_v1_projects__project_id__crm_contacts_get: {
+        parameters: {
+            query?: {
+                /** @description Tìm theo email, tên, công ty, số điện thoại */
+                q?: string | null;
+                status?: components["schemas"]["CrmContactStatus"][] | null;
+                /** @description 0 = chưa có người phụ trách */
+                assignee_id?: number | null;
+                /** @description Có email thuộc loại nhu cầu này */
+                inquiry_type?: components["schemas"]["CrmInquiryType"] | null;
+                /** @description Trường sắp xếp, tiền tố '-' = giảm dần */
+                sort?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CrmContactOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_contact_api_v1_projects__project_id__crm_contacts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrmContactCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrmContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_contact_api_v1_projects__project_id__crm_contacts__contact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrmContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_contact_api_v1_projects__project_id__crm_contacts__contact_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_contact_api_v1_projects__project_id__crm_contacts__contact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrmContactUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrmContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_emails_api_v1_projects__project_id__crm_emails_get: {
+        parameters: {
+            query?: {
+                /** @description Tìm theo tiêu đề, người gửi, công ty, tóm tắt */
+                q?: string | null;
+                contact_id?: number | null;
+                inquiry_type?: components["schemas"]["CrmInquiryType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CrmEmailLeadOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_email_api_v1_projects__project_id__crm_emails__lead_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: number;
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrmEmailLeadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_email_api_v1_projects__project_id__crm_emails__lead_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: number;
                 project_id: number;
             };
             cookie?: never;

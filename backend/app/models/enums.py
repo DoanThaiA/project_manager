@@ -111,6 +111,27 @@ class AttachmentCategory(StrEnum):
     result = "result"  # ảnh kết quả sau khi sửa
 
 
+class CrmContactStatus(StrEnum):
+    """Trạng thái theo dõi khách liên hệ CRM (cột crm_contacts.status, CHECK constraint)."""
+
+    new = "new"
+    contacted = "contacted"  # đã liên hệ lại
+    quoted = "quoted"  # đã gửi báo giá
+    negotiating = "negotiating"  # đang thương lượng
+    won = "won"  # chốt đơn
+    lost = "lost"  # không thành
+    spam = "spam"
+
+
+class CrmInquiryType(StrEnum):
+    """Loại nhu cầu trong email (cột crm_email_leads.inquiry_type, CHECK constraint) - giá trị n8n gửi sang."""
+
+    dat_hang = "dat_hang"  # đặt hàng
+    bao_gia = "bao_gia"  # xin báo giá
+    hoi_thong_tin = "hoi_thong_tin"  # hỏi thông tin
+    khac = "khac"
+
+
 class TextFileFolder(StrEnum):
     """Nhóm (folder trên R2) của file gắn trong ô văn bản: projects/<id>/text/<nhóm>/..."""
 

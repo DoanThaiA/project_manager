@@ -44,6 +44,8 @@ erDiagram
 | | `project_members` | Thành viên + vai trò trong từng dự án (1 người nhiều vai trò được) |
 | Doanh nghiệp (LMS) | `companies` | Doanh nghiệp dùng cho hệ thống LMS (`lms_mcv`); `users.company_id` + `users.employee_code` (duy nhất trong công ty): đăng nhập LMS bằng mã công ty + mã nhân viên — revision 0008. Bảng `lms_*` cùng database do repo `lms_mcv` quản lý (phiên bản ở `alembic_version_lms`) |
 | Khách hàng | `customers`, `customer_contacts` | Thông tin khách hàng, người liên hệ (tối đa 1 đầu mối chính) |
+| CRM (theo dự án) | `crm_contacts` | Khách liên hệ qua Gmail của một dự án (không phải `users` / `customers`): duy nhất theo `(project_id, email)`, trạng thái theo dõi `new → contacted → quoted → negotiating → won / lost / spam`, người phụ trách, ghi chú — revision 0012 |
+| | `crm_email_leads` | Mỗi email khách hỏi mua / báo giá / hỏi thông tin = 1 dòng (n8n lọc từ Gmail, AI trích xuất nhu cầu); `email_message_id` duy nhất trong dự án để n8n gửi lại không tạo trùng. Không audit (tránh chép nội dung email vào `activity_logs`) |
 | Dự án | `projects` | `key` (ERP, CRM…) làm tiền tố mã, duy nhất giữa các dự án chưa xoá (xoá mềm xong dùng lại được; mã yêu cầu / công việc duy nhất trong dự án — revision 0003), PO, Scrum Master, độ dài sprint, ngân sách giờ |
 | | `sprints` | Sprint goal, ngày, capacity, ghi chú Review/Retrospective |
 | Yêu cầu KH | `requirements` | Mã tự sinh `ERP-REQ-0001`, loại, nguồn, ưu tiên, trạng thái, tiêu chí nghiệm thu, ngày mong muốn/cam kết, duyệt/từ chối |

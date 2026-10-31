@@ -1,5 +1,7 @@
 import type {
   ActivityType,
+  CrmContactStatus,
+  CrmInquiryType,
   Priority,
   ProjectStatus,
   RequirementSource,
@@ -114,6 +116,24 @@ export const PROJECT_STATUS: Record<ProjectStatus, Meta> = {
   cancelled: { label: "Huỷ", tone: "gray" },
 };
 
+export const CRM_STATUS: Record<CrmContactStatus, Meta> = {
+  new: { label: "Mới", tone: "blue" },
+  contacted: { label: "Đã liên hệ", tone: "violet" },
+  quoted: { label: "Đã báo giá", tone: "amber" },
+  negotiating: { label: "Đang thương lượng", tone: "orange" },
+  won: { label: "Chốt đơn", tone: "green" },
+  lost: { label: "Không thành", tone: "gray" },
+  spam: { label: "Spam", tone: "red" },
+};
+export const CRM_CLOSED_STATUSES: CrmContactStatus[] = ["won", "lost", "spam"];
+
+export const CRM_INQUIRY_TYPE: Record<CrmInquiryType, Meta> = {
+  dat_hang: { label: "Đặt hàng", tone: "green" },
+  bao_gia: { label: "Xin báo giá", tone: "amber" },
+  hoi_thong_tin: { label: "Hỏi thông tin", tone: "blue" },
+  khac: { label: "Khác", tone: "gray" },
+};
+
 export const ACTION_LABEL: Record<string, string> = {
   create: "Tạo mới",
   update: "Cập nhật",
@@ -138,6 +158,7 @@ export const ENTITY_LABEL: Record<string, string> = {
   work_items: "Công việc",
   work_logs: "Log công việc",
   attachments: "File đính kèm",
+  crm_contacts: "Khách liên hệ (CRM)",
 };
 
 export const FIELD_LABEL: Record<string, string> = {
@@ -184,6 +205,13 @@ export const FIELD_LABEL: Record<string, string> = {
   business_value: "Giá trị KD",
   resolved_at: "Hoàn thành lúc",
   closed_at: "Đóng lúc",
+  full_name: "Họ tên",
+  email: "Email",
+  contact_email: "Email liên hệ khác",
+  phone: "Điện thoại",
+  company: "Công ty",
+  address: "Địa chỉ",
+  note: "Ghi chú",
 };
 
 export function labelOf(map: Record<string, string>, key: string) {

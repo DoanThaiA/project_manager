@@ -18,6 +18,12 @@ export type CustomerOcr = S["CustomerOcrOut"];
 export type Contact = S["ContactOut"];
 export type ContactOcr = S["ContactOcrOut"];
 
+export type CrmContact = S["CrmContactOut"];
+export type CrmEmail = S["CrmEmailLeadOut"];
+export type CrmStats = S["CrmStats"];
+export type CrmContactStatus = CrmContact["status"];
+export type CrmInquiryType = CrmEmail["inquiry_type"];
+
 export type Project = S["ProjectOut"];
 export type ProjectCreate = S["ProjectCreate"];
 export type ProjectSummary = S["ProjectSummary"];

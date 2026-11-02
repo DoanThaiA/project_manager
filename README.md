@@ -26,7 +26,7 @@ cp .env.example .env            # điền PM_DB_PASSWORD, SECRET_KEY (giá trị
 ./scripts/init_db.sh --demo     # tạo user + database, chạy migration Alembic (+ dữ liệu mẫu)
 ```
 
-Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Kết nối AI (MCP, connector URL) cho ban lãnh đạo: xem [docs/MCP.md](docs/MCP.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
+Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Kết nối AI (MCP, connector URL) cho ban lãnh đạo: xem [docs/MCP.md](docs/MCP.md). Nhận email khách từ Gmail qua n8n vào CRM dự án: xem [docs/CRM_N8N.md](docs/CRM_N8N.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
 `docker compose exec api python -m app.cli create-admin --username admin --email … --full-name "…"`
 
 Script không xoá dữ liệu có sẵn; dữ liệu mẫu chỉ nạp khi database còn trống.
@@ -131,6 +131,7 @@ Xác thực bằng JWT Bearer: `POST /auth/login` (form `username`, `password`) 
   `Authorization: Bearer <PAT>` — token truy cập của tài khoản có quyền `crm.create` trong dự án (vd: tài khoản bot là
   PO/BA của dự án). Trùng `email_message_id` thì bỏ qua (`created: false`); email gộp vào khách theo `customer_email`,
   chỉ điền các trường khách còn trống, không ghi đè thông tin đã sửa tay. `inquiry_type` lạ → `khac`.
+  Các bước dựng workflow n8n: [docs/CRM_N8N.md](docs/CRM_N8N.md).
 - **Audit**: mỗi transaction đặt `app.current_user_id` / `app.client_ip` (xem `app/db/session.py`), trigger DB ghi `activity_logs` với giá trị cũ/mới. Đăng nhập, đăng nhập thất bại cũng được ghi.
 
 Tài liệu thiết kế database: [docs/DATABASE.md](docs/DATABASE.md)

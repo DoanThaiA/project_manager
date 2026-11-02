@@ -101,7 +101,7 @@ Frontend chạy phía client sau đăng nhập (JWT trong localStorage). Ẩn/hi
 | `/attendance` | Chấm công của tôi: check-in / check-out từ mạng công ty, lịch công tháng |
 | `/customers` | Khách hàng & người liên hệ |
 | `/admin/users`, `/admin/roles`, `/admin/activity` | Người dùng, ma trận phân quyền, nhật ký hệ thống |
-| `/admin/attendance` | Chấm công: bảng công (thêm / sửa có lý do), tổng hợp tháng + CSV, mạng công ty, lần bị từ chối |
+| `/admin/attendance` | Chấm công: bảng công (thêm / sửa có lý do), tổng hợp tháng + công + CSV, ca làm việc (lịch theo thứ) + phân ca, mạng công ty, lần bị từ chối |
 
 ## API (`/api/v1`)
 
@@ -118,7 +118,7 @@ Xác thực bằng JWT Bearer: `POST /auth/login` (form `username`, `password`) 
 | Yêu cầu KH | `/projects/{pid}/requirements`, `POST …/{rid}/status`, `GET …/{rid}/history`, `GET …/{rid}/activity`, `…/{rid}/comments` |
 | Backlog | `/projects/{pid}/work-items` (lọc `backlog=true`, `sprint_id`, `status`, `assignee_id` = công việc có người này trong danh sách phụ trách…) |
 | Log công việc | `/projects/{pid}/work-logs`, `GET /me/work-logs` |
-| Chấm công | `POST /attendance/check-in` `/check-out`, `GET /attendance/me/today`, `GET /attendance/me/records?month=`, `GET /attendance/my-ip`, `/attendance/networks` (+ `POST …/current-ip`), `/attendance/records`, `GET /attendance/summary` (+ `/export`), `GET /attendance/events` |
+| Chấm công | `POST /attendance/check-in` `/check-out`, `GET /attendance/me/today`, `GET /attendance/me/records?month=`, `GET /attendance/my-ip`, `/attendance/shifts`, `PUT /attendance/users/{id}/shift`, `/attendance/networks` (+ `POST …/current-ip`), `/attendance/records`, `GET /attendance/summary` (+ `/export`), `GET /attendance/events` |
 | CRM | `POST /projects/{pid}/crm/emails/ingest` (n8n), `GET /projects/{pid}/crm/stats`, `/projects/{pid}/crm/contacts`, `GET/PATCH/DELETE …/contacts/{id}`, `GET /projects/{pid}/crm/emails` (lọc `contact_id`, `inquiry_type`, ngày), `GET/DELETE …/emails/{id}` |
 | Báo cáo & nhật ký | `GET /projects/{pid}/reports/summary`, `GET /projects/{pid}/reports/work-logs?group_by=user\|date\|activity_type\|work_item\|sprint`, `GET /projects/{pid}/activity-logs`, `GET /activity-logs` |
 

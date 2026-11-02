@@ -1,6 +1,12 @@
 from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
-from app.models.attendance import AttendanceEvent, AttendanceNetwork, AttendanceRecord
+from app.models.attendance import (
+    AttendanceEvent,
+    AttendanceNetwork,
+    AttendanceRecord,
+    AttendanceShift,
+    AttendanceShiftDay,
+)
 from app.models.crm import CrmContact, CrmEmailLead
 from app.models.customer import Customer, CustomerContact
 from app.models.notification import (
@@ -21,6 +27,8 @@ __all__ = [
     "AttendanceEvent",
     "AttendanceNetwork",
     "AttendanceRecord",
+    "AttendanceShift",
+    "AttendanceShiftDay",
     "CrmContact",
     "CrmEmailLead",
     "Customer",

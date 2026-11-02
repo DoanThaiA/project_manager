@@ -516,6 +516,65 @@ export interface paths {
         patch: operations["update_network_api_v1_attendance_networks__network_id__patch"];
         trace?: never;
     };
+    "/api/v1/attendance/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các ca làm việc */
+        get: operations["list_shifts_api_v1_attendance_shifts_get"];
+        put?: never;
+        /** Create Shift */
+        post: operations["create_shift_api_v1_attendance_shifts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/shifts/{shift_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sửa ca
+         * @description Gửi đủ các trường, kể cả lịch: thứ không có trong `days` thành ngày nghỉ. Chỉ áp dụng cho lần chấm sau: số phút muộn / về sớm / công của bản ghi cũ đã tính lúc chấm, không đổi.
+         */
+        put: operations["update_shift_api_v1_attendance_shifts__shift_id__put"];
+        post?: never;
+        /** Delete Shift */
+        delete: operations["delete_shift_api_v1_attendance_shifts__shift_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/users/{user_id}/shift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Gán ca cho nhân viên (null = ca mặc định)
+         * @description Áp dụng từ lần chấm tiếp theo; bản ghi cũ giữ ca lúc chấm.
+         */
+        put: operations["assign_shift_api_v1_attendance_users__user_id__shift_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attendance/records": {
         parameters: {
             query?: never;
@@ -2261,6 +2320,8 @@ export interface components {
         MonthOut: {
             /** Month */
             month: string;
+            /** @description Ca hiện tại của tôi */
+            shift: components["schemas"]["ShiftBrief"];
             /** Days */
             days: components["schemas"]["DayOut"][];
             /** Present Days */
@@ -2275,6 +2336,16 @@ export interface components {
             absent_days: number;
             /** Worked Minutes */
             worked_minutes: number;
+            /**
+             * Credit
+             * @description Số công thực tế
+             */
+            credit: number;
+            /**
+             * Expected Credit
+             * @description Số công chuẩn của các ngày làm việc đã qua
+             */
+            expected_credit: number;
         };
         /** MyIpOut */
         MyIpOut: {
@@ -2668,6 +2739,11 @@ export interface components {
             check_in_time: string;
             /** Check Out Time */
             check_out_time?: string | null;
+            /**
+             * Shift Id
+             * @description Bỏ trống = ca hiện tại của nhân viên
+             */
+            shift_id?: number | null;
             /** Note */
             note?: string | null;
             /**
@@ -2688,6 +2764,9 @@ export interface components {
              * Format: date
              */
             work_date: string;
+            /** Shift Id */
+            shift_id: number;
+            shift?: components["schemas"]["ShiftBrief"] | null;
             /**
              * Check In At
              * Format: date-time
@@ -2707,6 +2786,11 @@ export interface components {
             early_leave_minutes: number;
             /** Worked Minutes */
             worked_minutes: number | null;
+            /**
+             * Credit
+             * @description Số công của ngày (0 khi thiếu check-out / ngày nghỉ)
+             */
+            credit: number;
             /** Source */
             source: string;
             /** Note */
@@ -2740,6 +2824,11 @@ export interface components {
              * @description null = xoá giờ về
              */
             check_out_time?: string | null;
+            /**
+             * Shift Id
+             * @description Đổi ca áp dụng cho ngày này
+             */
+            shift_id?: number | null;
             /** Note */
             note?: string | null;
             /**
@@ -3051,8 +3140,31 @@ export interface components {
             /** Description */
             description?: string | null;
         };
-        /** ShiftOut */
-        ShiftOut: {
+        /** ShiftAssign */
+        ShiftAssign: {
+            /**
+             * Shift Id
+             * @description null = dùng ca mặc định
+             */
+            shift_id: number | null;
+        };
+        /** ShiftBrief */
+        ShiftBrief: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ShiftDay
+         * @description Lịch của ca trong một thứ. Thứ không có trong danh sách = ngày nghỉ của ca.
+         */
+        ShiftDay: {
+            /**
+             * Weekday
+             * @description ISO: 1 = thứ 2 ... 7 = chủ nhật
+             */
+            weekday: number;
             /**
              * Start Time
              * Format: time
@@ -3063,22 +3175,62 @@ export interface components {
              * Format: time
              */
             end_time: string;
+            /** Break Start */
+            break_start?: string | null;
+            /** Break End */
+            break_end?: string | null;
             /**
-             * Break Start
-             * Format: time
+             * Credit
+             * @description Số công của ngày (vd T7 làm buổi sáng = 0,5)
+             * @default 1
              */
-            break_start: string;
+            credit: number;
+        };
+        /**
+         * ShiftIn
+         * @description Tạo / sửa ca: gửi đủ các trường (form sửa ca gửi toàn bộ, kể cả lịch 7 ngày).
+         */
+        ShiftIn: {
+            /** Name */
+            name: string;
             /**
-             * Break End
-             * Format: time
+             * Late Grace Minutes
+             * @default 5
              */
-            break_end: string;
+            late_grace_minutes: number;
+            /**
+             * Early Grace Minutes
+             * @default 0
+             */
+            early_grace_minutes: number;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+            /** Days */
+            days: components["schemas"]["ShiftDay"][];
+        };
+        /** ShiftOut */
+        ShiftOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
             /** Late Grace Minutes */
             late_grace_minutes: number;
             /** Early Grace Minutes */
             early_grace_minutes: number;
-            /** Work Days */
-            work_days: number[];
+            /** Is Default */
+            is_default: boolean;
+            /** Days */
+            days: components["schemas"]["ShiftDay"][];
+            /**
+             * User Count
+             * @description Số user được gán ca này (không tính user dùng ca mặc định)
+             * @default 0
+             */
+            user_count: number;
         };
         /** SprintComplete */
         SprintComplete: {
@@ -3250,17 +3402,24 @@ export interface components {
         SummaryOut: {
             /** Month */
             month: string;
-            /**
-             * Work Days
-             * @description Số ngày làm việc của tháng (tính tới hôm qua nếu là tháng hiện tại)
-             */
-            work_days: number;
             /** Rows */
             rows: components["schemas"]["SummaryRow"][];
         };
         /** SummaryRow */
         SummaryRow: {
             user: components["schemas"]["UserBrief"];
+            /** @description Ca đang áp dụng (ca được gán, hoặc ca mặc định) */
+            shift: components["schemas"]["ShiftBrief"];
+            /**
+             * Assigned Shift Id
+             * @description Ca được gán riêng; null = dùng ca mặc định
+             */
+            assigned_shift_id: number | null;
+            /**
+             * Work Days
+             * @description Số ngày làm việc đã qua trong tháng theo ca của người này
+             */
+            work_days: number;
             /** Present Days */
             present_days: number;
             /** Late Count */
@@ -3277,6 +3436,16 @@ export interface components {
             absent_days: number;
             /** Worked Minutes */
             worked_minutes: number;
+            /**
+             * Credit
+             * @description Số công thực tế
+             */
+            credit: number;
+            /**
+             * Expected Credit
+             * @description Số công chuẩn của các ngày làm việc đã qua
+             */
+            expected_credit: number;
         };
         /** TelegramChatOut */
         TelegramChatOut: {
@@ -3328,6 +3497,8 @@ export interface components {
             ip: string | null;
             network: components["schemas"]["NetworkBrief"] | null;
             shift: components["schemas"]["ShiftOut"];
+            /** @description Lịch hôm nay theo ca; null = ngày nghỉ */
+            schedule: components["schemas"]["ShiftDay"] | null;
             record: components["schemas"]["RecordOut"] | null;
             /** Can Check In */
             can_check_in: boolean;
@@ -3457,6 +3628,14 @@ export interface components {
         UserRolesSet: {
             /** Role Ids */
             role_ids: number[];
+        };
+        /** UserShiftOut */
+        UserShiftOut: {
+            /** User Id */
+            user_id: number;
+            /** Assigned Shift Id */
+            assigned_shift_id: number | null;
+            shift: components["schemas"]["ShiftBrief"];
         };
         /**
          * UserStatus
@@ -4871,6 +5050,158 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shifts_api_v1_attendance_shifts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftOut"][];
+                };
+            };
+        };
+    };
+    create_shift_api_v1_attendance_shifts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_shift_api_v1_attendance_shifts__shift_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shift_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_shift_api_v1_attendance_shifts__shift_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shift_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_shift_api_v1_attendance_users__user_id__shift_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserShiftOut"];
                 };
             };
             /** @description Validation Error */

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, Spinner } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
-import type { AttendanceRecord, AttendanceToday } from "@/lib/types";
+import type { AttendanceRecord, AttendanceShiftDay, AttendanceToday } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** "2026-11-02T08:11:03+07:00" -> "08:11". */
@@ -28,6 +28,27 @@ export function fmtMinutes(m?: number | null) {
   if (m === null || m === undefined) return "—";
   if (m < 60) return `${m} phút`;
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;
+}
+
+/** 0.5 -> "0,5". */
+export function fmtCredit(v?: number | null) {
+  return (v ?? 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+}
+
+const WEEKDAY_LABEL = ["", "T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+/** Lịch của ca, gộp các thứ liền nhau cùng giờ: "T2–T6 08:00–17:30 · T7 08:00–12:00". */
+export function fmtSchedule(days: AttendanceShiftDay[]) {
+  const key = (d: AttendanceShiftDay) => `${fmtClock(d.start_time)}–${fmtClock(d.end_time)}`;
+  const groups: { from: number; to: number; hours: string }[] = [];
+  for (const d of [...days].sort((a, b) => a.weekday - b.weekday)) {
+    const last = groups.at(-1);
+    if (last && last.hours === key(d) && last.to === d.weekday - 1) last.to = d.weekday;
+    else groups.push({ from: d.weekday, to: d.weekday, hours: key(d) });
+  }
+  return groups
+    .map((g) => `${WEEKDAY_LABEL[g.from]}${g.to > g.from ? `–${WEEKDAY_LABEL[g.to]}` : ""} ${g.hours}`)
+    .join(" · ");
 }
 
 export function RecordBadges({ record }: { record: AttendanceRecord }) {
@@ -76,7 +97,7 @@ export function AttendanceCard() {
   return (
     <Card className="mb-6">
       <CardHeader
-        title="Chấm công hôm nay"
+        title={data ? `Chấm công hôm nay · ${data.shift.name}` : "Chấm công hôm nay"}
         action={
           <Link href="/attendance" className="text-[13px] font-medium text-brand hover:underline">
             Lịch công
@@ -91,11 +112,15 @@ export function AttendanceCard() {
         <div className="flex flex-wrap items-center gap-4 px-4 py-4">
           <div className="grid min-w-0 flex-1 grid-cols-2 gap-4 sm:max-w-sm">
             <div>
-              <p className="text-[13px] text-ink-3">Giờ vào · ca {fmtClock(data.shift.start_time)}</p>
+              <p className="text-[13px] text-ink-3">
+                Giờ vào · {data.schedule ? `ca ${fmtClock(data.schedule.start_time)}` : "ngày nghỉ"}
+              </p>
               <p className="text-2xl font-semibold tabular-nums">{fmtTime(record?.check_in_at)}</p>
             </div>
             <div>
-              <p className="text-[13px] text-ink-3">Giờ về · ca {fmtClock(data.shift.end_time)}</p>
+              <p className="text-[13px] text-ink-3">
+                Giờ về · {data.schedule ? `ca ${fmtClock(data.schedule.end_time)}` : "ngày nghỉ"}
+              </p>
               <p className="text-2xl font-semibold tabular-nums">{fmtTime(record?.check_out_at)}</p>
             </div>
             {record && (

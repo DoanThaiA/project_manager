@@ -3,22 +3,24 @@
 import csv
 import io
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import and_, cast, exists, func, or_, select
+from sqlalchemy import and_, cast, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import CIDR
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import client_ip, get_current_user, has_permission, oauth2_scheme, require_permission
-from app.core.config import settings
 from app.core.security import PAT_PREFIX
 from app.db.session import get_db
 from app.models import (
     AttendanceEvent,
     AttendanceNetwork,
     AttendanceRecord,
+    AttendanceShift,
+    AttendanceShiftDay,
     Permission,
     User,
     UserRole,
@@ -39,22 +41,30 @@ from app.schemas.attendance import (
     RecordCreate,
     RecordOut,
     RecordUpdate,
+    ShiftAssign,
+    ShiftBrief,
+    ShiftDay,
+    ShiftIn,
     ShiftOut,
     SummaryOut,
     SummaryRow,
     TodayOut,
+    UserShiftOut,
 )
 from app.schemas.common import Page
 from app.schemas.user import UserBrief
 from app.services.attendance import (
+    Shifts,
     at_time,
     flags,
     is_work_day,
     late_minutes,
+    load_shifts,
     match_network,
     network_of_ip,
     normalize_cidr,
     recompute,
+    schedule_of,
     work_date_of,
 )
 from app.services.common import not_found
@@ -76,18 +86,6 @@ async def _db_now(db: AsyncSession) -> datetime:
     return await db.scalar(select(func.now()))
 
 
-def _shift() -> ShiftOut:
-    return ShiftOut(
-        start_time=settings.attendance_start_time,
-        end_time=settings.attendance_end_time,
-        break_start=settings.attendance_break_start,
-        break_end=settings.attendance_break_end,
-        late_grace_minutes=settings.attendance_late_grace_minutes,
-        early_grace_minutes=settings.attendance_early_grace_minutes,
-        work_days=settings.attendance_work_days,
-    )
-
-
 def _month_range(month: str) -> tuple[date, date]:
     start = date(int(month[:4]), int(month[5:7]), 1)
     end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
@@ -102,7 +100,7 @@ async def _user_briefs(db: AsyncSession, ids: set[int]) -> dict[int, UserBrief]:
 
 
 async def _record_outs(
-    db: AsyncSession, records: list[AttendanceRecord], today: date, with_user: bool = False
+    db: AsyncSession, records: list[AttendanceRecord], today: date, shifts: Shifts, with_user: bool = False
 ) -> list[RecordOut]:
     network_ids = {r.check_in_network_id for r in records} | {r.check_out_network_id for r in records}
     network_ids.discard(None)
@@ -114,7 +112,8 @@ async def _record_outs(
     return [
         RecordOut.model_validate(r).model_copy(
             update={
-                **flags(r, today),
+                **flags(r, today, shifts.of_record(r)),
+                "shift": ShiftBrief.model_validate(shifts.of_record(r)),
                 "user": users.get(r.user_id),
                 "check_in_network": networks.get(r.check_in_network_id),
                 "check_out_network": networks.get(r.check_out_network_id),
@@ -124,21 +123,29 @@ async def _record_outs(
     ]
 
 
-async def _record_out(db: AsyncSession, record: AttendanceRecord, today: date) -> RecordOut:
-    return (await _record_outs(db, [record], today, with_user=True))[0]
+async def _record_out(db: AsyncSession, record: AttendanceRecord, today: date, shifts: Shifts) -> RecordOut:
+    return (await _record_outs(db, [record], today, shifts, with_user=True))[0]
 
 
-def _tally(records: list[AttendanceRecord], start: date, end: date, today: date, since: date) -> dict:
-    """Tổng hợp một người trong [start, end]: vắng = ngày làm việc đã qua (từ ngày tạo tài khoản) không có bản ghi."""
+def _tally(
+    records: list[AttendanceRecord], start: date, end: date, today: date, since: date, shifts: Shifts, user: User
+) -> dict:
+    """Tổng hợp một người trong [start, end]. Ngày làm việc / vắng / công chuẩn tính theo ca hiện tại của người đó
+    (từ ngày tạo tài khoản); đi muộn / về sớm / công thực tế theo bản ghi (đã tính lúc chấm)."""
+    shift = shifts.of_user(user)
     by_date = {r.work_date for r in records}
-    absent: list[date] = []
+    work_days: list[date] = []
+    expected_credit = 0.0
     day = max(start, since)
     while day <= end and day < today:
-        if is_work_day(day) and day not in by_date:
-            absent.append(day)
+        if sched := schedule_of(shift, day):
+            work_days.append(day)
+            expected_credit += float(sched.credit)
         day += timedelta(days=1)
-    marks = [flags(r, today) for r in records]
+    absent = [d for d in work_days if d not in by_date]
+    marks = [flags(r, today, shifts.of_record(r)) for r in records]
     return {
+        "work_days": len(work_days),
         "present_days": len(records),
         "late_count": sum(m["is_late"] for m in marks),
         "late_minutes": sum(r.late_minutes for r, m in zip(records, marks, strict=True) if m["is_late"]),
@@ -150,6 +157,8 @@ def _tally(records: list[AttendanceRecord], start: date, end: date, today: date,
         "absent_days": len(absent),
         "absent": set(absent),
         "worked_minutes": sum(r.worked_minutes or 0 for r in records),
+        "credit": float(sum(r.credit for r in records)),
+        "expected_credit": expected_credit,
     }
 
 
@@ -225,13 +234,18 @@ async def my_today(
     network = await match_network(db, ip)
     day = work_date_of(await _db_now(db))
     record = await _today_record(db, user.id, day)
+    shifts = await load_shifts(db)
+    # Đã chấm thì hiện ca ghi trên bản ghi hôm nay, chưa chấm thì ca hiện tại của user
+    shift = shifts.of_record(record) if record else shifts.of_user(user)
+    sched = schedule_of(shift, day)
     return TodayOut(
         work_date=day,
-        is_work_day=is_work_day(day),
+        is_work_day=sched is not None,
         ip=ip,
         network=NetworkBrief.model_validate(network) if network else None,
-        shift=_shift(),
-        record=await _record_out(db, record, day) if record else None,
+        shift=ShiftOut.model_validate(shift),
+        schedule=ShiftDay.model_validate(sched) if sched else None,
+        record=await _record_out(db, record, day, shifts) if record else None,
         can_check_in=network is not None and record is None,
         can_check_out=network is not None and record is not None,
     )
@@ -256,23 +270,26 @@ async def check_in(
 
     now = await _db_now(db)
     day = work_date_of(now)
+    shifts = await load_shifts(db)
+    shift = shifts.of_user(user)
     # Bấm đúp / hai tab cùng lúc: chỉ một bản ghi, giữ giờ vào đầu tiên
     await db.execute(
         pg_insert(AttendanceRecord)
         .values(
             user_id=user.id,
             work_date=day,
+            shift_id=shift.id,
             check_in_at=now,
             check_in_ip=ip,
             check_in_network_id=network.id,
-            late_minutes=late_minutes(day, now),
+            late_minutes=late_minutes(day, now, schedule_of(shift, day)),
             note=body.note if body else None,
         )
         .on_conflict_do_nothing(constraint="uq_attendance_records_user_date")
     )
     _log_event(db, request, user, "check_in", True, ip, network)
     await db.commit()
-    return await _record_out(db, await _today_record(db, user.id, day), day)
+    return await _record_out(db, await _today_record(db, user.id, day), day, shifts)
 
 
 @router.post(
@@ -303,10 +320,11 @@ async def check_out(
     record.check_out_at, record.check_out_ip, record.check_out_network_id = now, ip, network.id
     if body and body.note:
         record.note = body.note
-    recompute(record)
+    shifts = await load_shifts(db)
+    recompute(record, shifts.of_record(record))
     _log_event(db, request, user, "check_out", True, ip, network)
     await db.commit()
-    return await _record_out(db, record, day)
+    return await _record_out(db, record, day, shifts)
 
 
 @router.get("/me/records", response_model=MonthOut, summary="Lịch công một tháng của tôi")
@@ -324,15 +342,20 @@ async def my_records(
             .order_by(AttendanceRecord.work_date)
         )
     )
-    outs = {r.work_date: r for r in await _record_outs(db, records, today)}
-    tally = _tally(records, start, end, today, work_date_of(user.created_at))
+    shifts = await load_shifts(db)
+    shift = shifts.of_user(user)
+    outs = {r.work_date: r for r in await _record_outs(db, records, today, shifts)}
+    tally = _tally(records, start, end, today, work_date_of(user.created_at), shifts, user)
     days = []
     day = start
     while day <= end:
-        days.append(DayOut(date=day, is_work_day=is_work_day(day), absent=day in tally["absent"], record=outs.get(day)))
+        days.append(
+            DayOut(date=day, is_work_day=is_work_day(day, shift), absent=day in tally["absent"], record=outs.get(day))
+        )
         day += timedelta(days=1)
     tally.pop("absent")
-    return MonthOut(month=month, days=days, **tally)
+    tally.pop("work_days")
+    return MonthOut(month=month, shift=ShiftBrief.model_validate(shift), days=days, **tally)
 
 
 # ---------------------------------------------------------------- Mạng công ty
@@ -429,6 +452,154 @@ async def delete_network(
     await db.commit()
 
 
+# ---------------------------------------------------------------- Ca làm việc
+
+
+async def _ensure_shift_name_free(db: AsyncSession, name: str, exclude_id: int | None = None) -> None:
+    cond = [AttendanceShift.name == name]
+    if exclude_id:
+        cond.append(AttendanceShift.id != exclude_id)
+    if await db.scalar(select(exists().where(*cond))):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Đã có ca tên '{name}'")
+
+
+async def _make_default(db: AsyncSession, shift_id: int | None) -> None:
+    """Bỏ cờ mặc định của các ca khác (chỉ một ca mặc định)."""
+    stmt = update(AttendanceShift).where(AttendanceShift.is_default).values(is_default=False)
+    if shift_id:
+        stmt = stmt.where(AttendanceShift.id != shift_id)
+    await db.execute(stmt)
+
+
+def _day_values(day: ShiftDay) -> dict:
+    return {**day.model_dump(), "credit": Decimal(str(day.credit))}  # numeric(3,2): truyền Decimal, không truyền float
+
+
+async def _shift_out(db: AsyncSession, shift: AttendanceShift) -> ShiftOut:
+    count = await db.scalar(select(func.count()).where(User.attendance_shift_id == shift.id, User.deleted_at.is_(None)))
+    return ShiftOut.model_validate(shift).model_copy(update={"user_count": count or 0})
+
+
+@router.get("/shifts", response_model=list[ShiftOut], summary="Các ca làm việc")
+async def list_shifts(
+    _: User = Depends(require_permission("attendance.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    counts = dict(
+        (
+            await db.execute(
+                select(User.attendance_shift_id, func.count())
+                .where(User.attendance_shift_id.is_not(None), User.deleted_at.is_(None))
+                .group_by(User.attendance_shift_id)
+            )
+        ).all()
+    )
+    shifts = await db.scalars(select(AttendanceShift).order_by(AttendanceShift.is_default.desc(), AttendanceShift.name))
+    return [ShiftOut.model_validate(s).model_copy(update={"user_count": counts.get(s.id, 0)}) for s in shifts]
+
+
+@router.post("/shifts", response_model=ShiftOut, status_code=status.HTTP_201_CREATED)
+async def create_shift(
+    body: ShiftIn,
+    _: User = Depends(require_permission("attendance.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    await _ensure_shift_name_free(db, body.name)
+    if body.is_default:
+        await _make_default(db, None)
+    shift = AttendanceShift(
+        **body.model_dump(exclude={"days"}), days=[AttendanceShiftDay(**_day_values(d)) for d in body.days]
+    )
+    db.add(shift)
+    await db.commit()
+    return await _shift_out(db, shift)
+
+
+@router.put(
+    "/shifts/{shift_id}",
+    response_model=ShiftOut,
+    summary="Sửa ca",
+    description=(
+        "Gửi đủ các trường, kể cả lịch: thứ không có trong `days` thành ngày nghỉ. Chỉ áp dụng cho lần chấm sau: "
+        "số phút muộn / về sớm / công của bản ghi cũ đã tính lúc chấm, không đổi."
+    ),
+)
+async def update_shift(
+    shift_id: int,
+    body: ShiftIn,
+    _: User = Depends(require_permission("attendance.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    shift = await db.get(AttendanceShift, shift_id)
+    if shift is None:
+        raise not_found("ca làm việc")
+    await _ensure_shift_name_free(db, body.name, exclude_id=shift_id)
+    if shift.is_default and not body.is_default:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Phải có một ca mặc định: hãy chọn ca khác làm mặc định"
+        )
+    if body.is_default and not shift.is_default:
+        await _make_default(db, shift_id)
+    for field, value in body.model_dump(exclude={"days"}).items():
+        setattr(shift, field, value)
+    # Sửa tại chỗ theo thứ (không xoá rồi tạo lại cùng khoá chính)
+    existing = {d.weekday: d for d in shift.days}
+    for day in body.days:
+        if row := existing.pop(day.weekday, None):
+            for field, value in _day_values(day).items():
+                setattr(row, field, value)
+        else:
+            shift.days.append(AttendanceShiftDay(**_day_values(day)))
+    for row in existing.values():
+        shift.days.remove(row)
+    await db.commit()
+    return await _shift_out(db, shift)
+
+
+@router.delete("/shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_shift(
+    shift_id: int,
+    _: User = Depends(require_permission("attendance.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    shift = await db.get(AttendanceShift, shift_id)
+    if shift is None:
+        raise not_found("ca làm việc")
+    if shift.is_default:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Không xoá được ca mặc định")
+    if await db.scalar(select(exists().where(AttendanceRecord.shift_id == shift_id))):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ca đã có bản ghi chấm công, không xoá được")
+    await db.delete(shift)  # user đang gán ca này -> về ca mặc định (FK ON DELETE SET NULL)
+    await db.commit()
+
+
+@router.put(
+    "/users/{user_id}/shift",
+    response_model=UserShiftOut,
+    summary="Gán ca cho nhân viên (null = ca mặc định)",
+    description="Áp dụng từ lần chấm tiếp theo; bản ghi cũ giữ ca lúc chấm.",
+)
+async def assign_shift(
+    user_id: int,
+    body: ShiftAssign,
+    _: User = Depends(require_permission("attendance.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    target = await db.get(User, user_id)
+    if target is None or target.deleted_at is not None:
+        raise not_found("người dùng")
+    shifts = await load_shifts(db)
+    if body.shift_id is not None:
+        _shift_by_id(shifts, body.shift_id)
+    target.attendance_shift_id = body.shift_id
+    await db.commit()
+    return UserShiftOut(
+        user_id=user_id,
+        assigned_shift_id=body.shift_id,
+        shift=ShiftBrief.model_validate(shifts.of_user(target)),
+    )
+
+
 # ---------------------------------------------------------------- Bảng công
 
 
@@ -444,7 +615,11 @@ async def list_records(
     db: AsyncSession = Depends(get_db),
 ):
     today = work_date_of(await _db_now(db))
-    stmt = select(AttendanceRecord).join(User, User.id == AttendanceRecord.user_id)
+    stmt = (
+        select(AttendanceRecord)
+        .join(User, User.id == AttendanceRecord.user_id)
+        .join(AttendanceShift, AttendanceShift.id == AttendanceRecord.shift_id)
+    )
     if from_:
         stmt = stmt.where(AttendanceRecord.work_date >= from_)
     if to:
@@ -452,11 +627,11 @@ async def list_records(
     if user_id:
         stmt = stmt.where(AttendanceRecord.user_id == user_id)
     if flag == "late":
-        stmt = stmt.where(AttendanceRecord.late_minutes > settings.attendance_late_grace_minutes)
+        stmt = stmt.where(AttendanceRecord.late_minutes > AttendanceShift.late_grace_minutes)
     elif flag == "early_leave":
         stmt = stmt.where(
             AttendanceRecord.check_out_at.is_not(None),
-            AttendanceRecord.early_leave_minutes > settings.attendance_early_grace_minutes,
+            AttendanceRecord.early_leave_minutes > AttendanceShift.early_grace_minutes,
         )
     elif flag == "missing_checkout":
         stmt = stmt.where(AttendanceRecord.check_out_at.is_(None), AttendanceRecord.work_date < today)
@@ -467,8 +642,14 @@ async def list_records(
             stmt.order_by(AttendanceRecord.work_date.desc(), User.full_name).limit(size).offset((page - 1) * size)
         )
     )
-    items = await _record_outs(db, records, today, with_user=True)
+    items = await _record_outs(db, records, today, await load_shifts(db), with_user=True)
     return {"items": items, "total": total or 0, "page": page, "size": size}
+
+
+def _shift_by_id(shifts: Shifts, shift_id: int) -> AttendanceShift:
+    if shift_id not in shifts.by_id:
+        raise not_found("ca làm việc")
+    return shifts.by_id[shift_id]
 
 
 def _check_times(record: AttendanceRecord) -> None:
@@ -495,6 +676,8 @@ async def create_record(
         raise not_found("người dùng")
     if await _today_record(db, body.user_id, body.work_date):
         raise HTTPException(status.HTTP_409_CONFLICT, "Ngày này đã có công, hãy sửa bản ghi có sẵn")
+    shifts = await load_shifts(db)
+    shift = _shift_by_id(shifts, body.shift_id) if body.shift_id else shifts.of_user(target)
     record = AttendanceRecord(
         user_id=body.user_id,
         work_date=body.work_date,
@@ -506,10 +689,10 @@ async def create_record(
         adjusted_reason=body.adjusted_reason,
     )
     _check_times(record)
-    recompute(record)
+    recompute(record, shift)
     db.add(record)
     await db.commit()
-    return await _record_out(db, record, today)
+    return await _record_out(db, record, today, shifts)
 
 
 @router.patch("/records/{record_id}", response_model=RecordOut, summary="Sửa giờ vào / về (bắt buộc lý do)")
@@ -530,10 +713,12 @@ async def update_record(
     if "note" in fields:
         record.note = body.note
     record.source, record.adjusted_by, record.adjusted_reason = "admin", admin.id, body.adjusted_reason
+    shifts = await load_shifts(db)
+    shift = _shift_by_id(shifts, body.shift_id) if body.shift_id else shifts.of_record(record)
     _check_times(record)
-    recompute(record)
+    recompute(record, shift)
     await db.commit()
-    return await _record_out(db, record, work_date_of(await _db_now(db)))
+    return await _record_out(db, record, work_date_of(await _db_now(db)), shifts)
 
 
 @router.delete("/records/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -578,15 +763,20 @@ async def _summary(db: AsyncSession, month: str) -> SummaryOut:
     for r in await db.scalars(select(AttendanceRecord).where(in_month, AttendanceRecord.user_id.in_(list(by_user)))):
         by_user[r.user_id].append(r)
 
+    shifts = await load_shifts(db)
     rows = []
     for u in users:
-        tally = _tally(by_user[u.id], start, end, today, work_date_of(u.created_at))
+        tally = _tally(by_user[u.id], start, end, today, work_date_of(u.created_at), shifts, u)
         tally.pop("absent")
-        rows.append(SummaryRow(user=UserBrief.model_validate(u), **tally))
-    work_days = sum(
-        1 for i in range((end - start).days + 1) if (d := start + timedelta(days=i)) < today and is_work_day(d)
-    )
-    return SummaryOut(month=month, work_days=work_days, rows=rows)
+        rows.append(
+            SummaryRow(
+                user=UserBrief.model_validate(u),
+                shift=ShiftBrief.model_validate(shifts.of_user(u)),
+                assigned_shift_id=u.attendance_shift_id,
+                **tally,
+            )
+        )
+    return SummaryOut(month=month, rows=rows)
 
 
 @router.get("/summary", response_model=SummaryOut, summary="Tổng hợp công theo người trong tháng")
@@ -611,14 +801,18 @@ async def export_summary(
         [
             "Tài khoản",
             "Họ tên",
+            "Ca",
+            "Ngày làm việc",
             "Ngày có mặt",
-            f"Vắng (/{data.work_days} ngày làm việc)",
+            "Vắng",
             "Đi muộn (lần)",
             "Đi muộn (phút)",
             "Về sớm (lần)",
             "Về sớm (phút)",
             "Thiếu check-out",
             "Giờ làm",
+            "Công chuẩn",
+            "Công",
         ]
     )
     for r in data.rows:
@@ -626,6 +820,8 @@ async def export_summary(
             [
                 r.user.username,
                 r.user.full_name,
+                r.shift.name,
+                r.work_days,
                 r.present_days,
                 r.absent_days,
                 r.late_count,
@@ -634,6 +830,8 @@ async def export_summary(
                 r.early_leave_minutes,
                 r.missing_checkout_count,
                 round(r.worked_minutes / 60, 1),
+                r.expected_credit,
+                r.credit,
             ]
         )
     # BOM để Excel nhận đúng UTF-8 (tiếng Việt có dấu)

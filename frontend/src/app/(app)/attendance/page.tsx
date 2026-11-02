@@ -6,7 +6,7 @@ import { vi } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
-import { AttendanceCard, RecordBadges, fmtMinutes, fmtTime } from "@/components/attendance";
+import { AttendanceCard, RecordBadges, fmtCredit, fmtMinutes, fmtTime } from "@/components/attendance";
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import { Card, PageHeader, Spinner, Stat, Table } from "@/components/ui/misc";
@@ -26,11 +26,15 @@ export default function MyAttendancePage() {
 
   return (
     <>
-      <PageHeader title="Chấm công của tôi" description="Giờ vào / giờ về theo ngày; chỉ chấm được khi dùng mạng công ty" />
+      <PageHeader
+        title="Chấm công của tôi"
+        description={`${m ? `Ca: ${m.shift.name} · ` : ""}Giờ vào / giờ về theo ngày; chỉ chấm được khi dùng mạng công ty`}
+      />
 
       {offset === 0 && <AttendanceCard />}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <Stat label="Công" value={m ? fmtCredit(m.credit) : "—"} sub={m && `chuẩn ${fmtCredit(m.expected_credit)}`} />
         <Stat label="Ngày có mặt" value={m?.present_days ?? "—"} />
         <Stat label="Đi muộn" value={m?.late_count ?? "—"} sub="lần" />
         <Stat label="Về sớm" value={m?.early_leave_count ?? "—"} sub="lần" />
@@ -66,6 +70,7 @@ export default function MyAttendancePage() {
                 <th>Giờ vào</th>
                 <th>Giờ về</th>
                 <th>Giờ làm</th>
+                <th>Công</th>
                 <th>Trạng thái</th>
               </tr>
             </thead>
@@ -83,6 +88,7 @@ export default function MyAttendancePage() {
                       <td className="tabular-nums">{fmtTime(d.record?.check_in_at)}</td>
                       <td className="tabular-nums">{fmtTime(d.record?.check_out_at)}</td>
                       <td className="tabular-nums">{fmtMinutes(d.record?.worked_minutes)}</td>
+                      <td className="tabular-nums">{d.record ? fmtCredit(d.record.credit) : "—"}</td>
                       <td>
                         {d.record ? (
                           <RecordBadges record={d.record} />

@@ -64,6 +64,10 @@ class User(TimestampMixin, SoftDeleteMixin, Base):
     employee_code: Mapped[str | None] = mapped_column(
         CITEXT, comment="Mã nhân viên, duy nhất trong công ty; đăng nhập LMS bằng mã công ty + mã nhân viên"
     )
+    # Ca chấm công (revision 0014); NULL = ca mặc định
+    attendance_shift_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("attendance_shifts.id", ondelete="SET NULL")
+    )
     status: Mapped[UserStatus] = mapped_column(pg_enum(UserStatus, "user_status"), default=UserStatus.active)
     is_system_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -72,3 +72,5 @@ export type AttendanceDay = S["DayOut"];
 export type AttendanceSummary = S["SummaryOut"];
 export type AttendanceEvent = S["EventOut"];
 export type MyIp = S["MyIpOut"];
+export type AttendanceShift = S["ShiftOut"];
+export type AttendanceShiftDay = S["ShiftDay"];

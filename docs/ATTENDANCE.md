@@ -21,7 +21,9 @@ Máy nhân viên ─► router văn phòng (IP công cộng 113.161.x.x) ─► 
 
 Phạm vi:
 
-- **Một ca cố định 08:00 – 17:30** cho tất cả mọi người. Mỗi ngày chỉ chấm **2 lần: lúc đến (check-in) và lúc
+- **Ca làm việc gán cho từng user**, lịch riêng cho từng thứ (mục 2.2): có sẵn *Hành chính* (mặc định,
+  T2 – T6 08:00 – 17:30, T7 08:00 – 12:00) và *Ca sáng* (T2 – T6 08:00 – 12:00); quản lý thêm / sửa ca được.
+  Tính **công**: T2 – T6 1 công (cả ca sáng), T7 0,5 công. Mỗi ngày chỉ chấm **2 lần: lúc đến (check-in) và lúc
   về (check-out)**.
 - Chấm công **theo từng user**: bản ghi gắn với `users.id`. Ai có quyền `attendance.checkin` thì chấm được.
   **Không dùng bảng `companies`** (LMS), không tách cấu hình hay báo cáo theo công ty.
@@ -120,23 +122,52 @@ Ràng buộc khi thêm/sửa (kiểm tra ở API, trả 422 kèm thông báo):
   không bao giờ thấy các IP này từ client thật. Máy dev đặt `ATTENDANCE_ALLOW_PRIVATE_NETWORKS=true`
   (`backend/.env`) để khai báo được `127.0.0.1` và test bằng localhost. Production luôn để `false` (mặc định).
 
-### 2.2 Ca làm: cấu hình cố định, không có bảng
+### 2.2 Ca làm việc: lịch theo từng thứ, gán theo user, tính công (migration `0014`)
 
-Chỉ có **một ca cố định**, nên ca làm đặt trong `config.py` (đổi qua `.env` nếu cần) chứ không lưu thành
-bảng, và không có màn hình sửa ca:
-
-```python
-# config.py
-attendance_start_time: time = time(8, 0)       # giờ vào
-attendance_end_time: time = time(17, 30)       # giờ về
-attendance_break_start: time = time(12, 0)     # nghỉ trưa, không tính vào giờ làm
-attendance_break_end: time = time(13, 30)
-attendance_late_grace_minutes: int = 5         # vào muộn <= 5 phút không tính là đi muộn
-attendance_early_grace_minutes: int = 0
-attendance_work_days: list[int] = [1, 2, 3, 4, 5]  # ISO: 1 = thứ 2 ... 7 = chủ nhật
+```sql
+CREATE TABLE attendance_shifts (
+    id                   int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name                 varchar(100) NOT NULL UNIQUE,
+    late_grace_minutes   smallint NOT NULL DEFAULT 5,  -- vào muộn <= 5 phút không tính là đi muộn
+    early_grace_minutes  smallint NOT NULL DEFAULT 0,
+    is_default           boolean  NOT NULL DEFAULT false  -- đúng một ca mặc định
+);
+CREATE TABLE attendance_shift_days (            -- có dòng = ngày làm việc, không có dòng = ngày nghỉ
+    shift_id     int      NOT NULL REFERENCES attendance_shifts(id) ON DELETE CASCADE,
+    weekday      smallint NOT NULL,             -- ISO: 1 = thứ 2 ... 7 = chủ nhật
+    start_time   time     NOT NULL,
+    end_time     time     NOT NULL,
+    break_start  time,                          -- nghỉ trưa, không tính vào giờ làm; NULL = không nghỉ
+    break_end    time,
+    credit       numeric(3,2) NOT NULL DEFAULT 1,  -- số công của ngày (0 < credit <= 1)
+    PRIMARY KEY (shift_id, weekday)
+);
+ALTER TABLE users ADD COLUMN attendance_shift_id int REFERENCES attendance_shifts(id) ON DELETE SET NULL;
+ALTER TABLE attendance_records
+    ADD COLUMN shift_id int NOT NULL REFERENCES attendance_shifts(id),
+    ADD COLUMN credit numeric(3,2) NOT NULL DEFAULT 0;
 ```
 
-`late_minutes` / `early_leave_minutes` được tính và lưu ngay lúc chấm theo giờ vào / về ở trên.
+Có sẵn 2 ca:
+
+| Ca | T2 – T6 | T7 | CN |
+|---|---|---|---|
+| **Hành chính** (mặc định) | 08:00 – 17:30, nghỉ 12:00 – 13:30 · **1 công** | 08:00 – 12:00 · **0,5 công** | nghỉ |
+| **Ca sáng** | 08:00 – 12:00 · **1 công** | nghỉ | nghỉ |
+
+- User chưa được gán ca (`attendance_shift_id IS NULL`) dùng ca mặc định. Xoá một ca thì user đang gán ca đó
+  về ca mặc định. Không xoá được ca mặc định, hay ca đã có bản ghi chấm công.
+- Khi chấm, hệ thống lấy lịch của **đúng thứ hôm đó** trong ca: thứ 7 ca Hành chính vào 08:10 là muộn 10 phút,
+  về 12:00 là đủ. Chấm vào ngày nghỉ của ca (vd chủ nhật) vẫn ghi lại, nhãn *Ngoài ngày làm việc*, không tính
+  muộn / về sớm, 0 công.
+- **Công** (`attendance_records.credit`): có **đủ giờ vào + giờ về** trong ngày làm việc của ca thì được công
+  của ngày đó (1 hoặc 0,5). Đi muộn / về sớm **không trừ công** (đã có số phút riêng để xử lý theo quy chế).
+  Thiếu check-out thì 0 công cho tới khi quản lý sửa giờ về.
+- Mỗi bản ghi lưu **ca lúc chấm** (`shift_id`); số phút muộn / về sớm / giờ làm / công được tính và lưu ngay lúc
+  chấm. Đổi ca của user, hay sửa lịch của ca, chỉ áp dụng cho lần chấm sau. Admin sửa công thì được chọn lại
+  ca cho ngày đó và hệ thống tính lại.
+- Tổng hợp tháng: **công chuẩn** = tổng công các ngày làm việc đã qua theo **ca hiện tại** của từng người;
+  **công thực tế** = tổng `credit` các bản ghi. Ngày làm việc không có bản ghi là *vắng*.
 
 ### 2.3 `attendance_records`: bảng công, mỗi người một dòng mỗi ngày
 
@@ -151,7 +182,7 @@ CREATE TABLE attendance_records (
     check_out_at         timestamptz,
     check_out_ip         inet,
     check_out_network_id bigint REFERENCES attendance_networks(id) ON DELETE SET NULL,
-    late_minutes         int NOT NULL DEFAULT 0,          -- số phút vào sau 08:00
+    late_minutes         int NOT NULL DEFAULT 0,          -- số phút vào sau giờ vào của ca
     early_leave_minutes  int NOT NULL DEFAULT 0,          -- số phút về trước 17:30
     worked_minutes       int,                             -- (ra - vào) - phần trùng giờ nghỉ trưa
     source               varchar(10) NOT NULL DEFAULT 'web' CHECK (source IN ('web', 'admin')),
@@ -252,7 +283,7 @@ tag `"Chấm công"`.
   "work_date": "2026-11-02",
   "ip": "113.161.10.20",
   "network": { "id": 1, "name": "VP Hà Nội - Viettel" },
-  "shift": { "start_time": "08:00", "end_time": "17:30", "is_work_day": true },
+  "shift": { "id": 1, "name": "Hành chính", "start_time": "08:00:00", "end_time": "17:30:00", "...": "..." },
   "record": { "check_in_at": "2026-11-02T08:11:03+07:00", "check_out_at": null, "late_minutes": 11, "is_late": true },
   "can_check_in": false,
   "can_check_out": true
@@ -279,13 +310,16 @@ không tạo hai bản ghi.
 
 | Endpoint | Quyền | Mô tả |
 |---|---|---|
+| `GET /shifts` | view | Các ca, kèm số người được gán |
+| `POST /shifts`, `PUT /shifts/{id}`, `DELETE /shifts/{id}` | manage | Thêm / sửa / xoá ca. Gửi đủ trường kèm `days` (lịch từng thứ); thứ không có trong `days` = ngày nghỉ |
+| `PUT /users/{user_id}/shift` | manage | Body `{ "shift_id": int \| null }`: gán ca cho user, `null` = ca mặc định |
 | `GET /networks`, `POST /networks`, `PATCH/DELETE /networks/{id}` | manage | Mạng văn phòng |
 | `POST /networks/current-ip` | manage | Body `{ "name": str }`: thêm IP đang dùng. IPv4 → `/32`, IPv6 → `/64` |
 | `GET /records?from&to&user_id&status` | view | Bảng công, phân trang như các API khác |
 | `POST /records` | manage | Thêm công cho ngày nhân viên quên chấm. Bắt buộc `adjusted_reason`, `source='admin'` |
-| `PATCH /records/{id}` | manage | Sửa giờ vào / ra. Bắt buộc `adjusted_reason`, tính lại số phút. Thay đổi ghi vào nhật ký hệ thống |
+| `PATCH /records/{id}` | manage | Sửa giờ vào / ra (và ca nếu cần). Bắt buộc `adjusted_reason`, tính lại số phút. Thay đổi ghi vào nhật ký hệ thống |
 | `DELETE /records/{id}` | manage | Xoá bản ghi sai |
-| `GET /summary?month=` | view | Theo từng người: số ngày có mặt, số lần / tổng phút đi muộn, về sớm, thiếu check-out, vắng, tổng giờ làm |
+| `GET /summary?month=` | view | Theo từng người: ca, công thực tế / công chuẩn, số ngày có mặt, số lần / tổng phút đi muộn, về sớm, thiếu check-out, vắng, tổng giờ làm |
 | `GET /summary/export?month=` | view | CSV UTF-8 có BOM (mở thẳng bằng Excel) |
 | `GET /events?user_id&accepted` | manage | Log thô, xem các lần bị từ chối |
 
@@ -305,11 +339,12 @@ không tạo hai bản ghi.
 | Tab | Nội dung |
 |---|---|
 | Bảng công | Lọc theo tháng / người / trạng thái; sửa giờ, thêm công (bắt buộc nhập lý do); xuất CSV |
-| Tổng hợp tháng | Bảng theo người, số liệu như `GET /summary` |
+| Tổng hợp tháng | Bảng theo người (kèm ca, công thực tế / công chuẩn), số liệu như `GET /summary` |
+| Ca làm việc | Danh sách ca; form sửa ca là bảng 7 ngày (làm / nghỉ, giờ vào / về, nghỉ trưa, 1 hoặc 0,5 công); **phân ca cho từng nhân viên** |
 | Mạng công ty | Danh sách CIDR, bật / tắt; nút **Thêm IP tôi đang dùng** (bấm khi đang ở văn phòng) |
 | Lần bị từ chối | Log `attendance_events` có `accepted = false` |
 
-Tab nào cũng chỉ hiện với người có quyền tương ứng (`attendance.manage` cho 2 tab cuối). Backend vẫn kiểm tra
+Tab nào cũng chỉ hiện với người có quyền tương ứng (`attendance.manage` cho 3 tab cuối). Backend vẫn kiểm tra
 lại quyền. Sau khi xong backend, chạy `npm run gen:api`.
 
 ## 5. Test (`backend/tests/test_attendance.py`)
@@ -374,7 +409,7 @@ Kiểm tra IP chứng minh **thiết bị đang dùng mạng công ty**, không 
 Ngoài phạm vi MVP, làm ở giai đoạn 2:
 
 - Đơn giải trình (quên chấm, đi công tác, làm ngoài văn phòng) và luồng duyệt.
-- Ngày lễ, nghỉ phép; quy đổi ngày công (0.5 / 1 công) theo quy chế nhân sự.
+- Ngày lễ, nghỉ phép (trừ vào công chuẩn).
 - Telegram nhắc khi chưa check-in sau giờ vào (dùng worker thông báo có sẵn).
 - Tool MCP `attendance_summary` cho ban lãnh đạo; so giờ công với giờ log công việc.
 - Nhận log từ máy chấm công khuôn mặt nếu công ty mua sau này.
@@ -383,8 +418,9 @@ Ngoài phạm vi MVP, làm ở giai đoạn 2:
 
 | File | Việc |
 |---|---|
-| `backend/app/api/deps.py`, `backend/app/core/config.py` | `client_ip()` mới + `trusted_proxies`, giờ vào / về cố định `attendance_*` |
+| `backend/app/api/deps.py`, `backend/app/core/config.py` | `client_ip()` mới + `trusted_proxies` |
 | `backend/migrations/versions/0013_attendance.py` | 3 bảng (`attendance_networks`, `attendance_records`, `attendance_events`), quyền, vai trò HR |
+| `backend/migrations/versions/0014_attendance_shifts.py` | `attendance_shifts` + lịch theo thứ `attendance_shift_days` (2 ca có sẵn), `users.attendance_shift_id`, `attendance_records.shift_id` / `credit` |
 | `backend/app/models/attendance.py`, `backend/app/models/__init__.py` | Model |
 | `backend/app/schemas/attendance.py`, `backend/app/services/attendance.py` | Schema, phần tính toán |
 | `backend/app/api/v1/endpoints/attendance.py`, `backend/app/api/v1/api.py` | Router `/attendance` |

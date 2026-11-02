@@ -1,4 +1,3 @@
-from datetime import time
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,14 +22,7 @@ class Settings(BaseSettings):
     # Proxy tin cậy trước API (nginx, Next.js, mạng docker): bỏ qua khi đọc X-Forwarded-For từ phải sang trái
     trusted_proxies: list[str] = ["127.0.0.0/8", "::1/128", "172.16.0.0/12", "10.0.0.0/8"]
 
-    # Chấm công theo IP mạng công ty (docs/ATTENDANCE.md): một ca cố định, giờ Việt Nam
-    attendance_start_time: time = time(8, 0)
-    attendance_end_time: time = time(17, 30)
-    attendance_break_start: time = time(12, 0)  # nghỉ trưa, không tính vào giờ làm
-    attendance_break_end: time = time(13, 30)
-    attendance_late_grace_minutes: int = 5  # vào muộn <= 5 phút không tính là đi muộn
-    attendance_early_grace_minutes: int = 0
-    attendance_work_days: list[int] = [1, 2, 3, 4, 5]  # ISO: 1 = thứ 2 ... 7 = chủ nhật
+    # Chấm công theo IP mạng công ty (docs/ATTENDANCE.md); ca làm lưu trong bảng attendance_shifts
     attendance_allow_private_networks: bool = False  # chỉ bật trên máy dev: cho khai báo 127.0.0.1, 192.168.x.x
 
     # Cloudflare Images lưu ảnh đính kèm công việc

@@ -137,12 +137,12 @@ def _tally(
     work_days: list[date] = []
     expected_credit = 0.0
     day = max(start, since)
-    while day <= end and day < today:
+    while day <= end and day <= today:  # tính cả hôm nay; vắng chỉ tính các ngày đã qua
         if sched := schedule_of(shift, day):
             work_days.append(day)
             expected_credit += float(sched.credit)
         day += timedelta(days=1)
-    absent = [d for d in work_days if d not in by_date]
+    absent = [d for d in work_days if d < today and d not in by_date]
     marks = [flags(r, today, shifts.of_record(r)) for r in records]
     return {
         "work_days": len(work_days),

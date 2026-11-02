@@ -2343,7 +2343,7 @@ export interface components {
             credit: number;
             /**
              * Expected Credit
-             * @description Số công chuẩn của các ngày làm việc đã qua
+             * @description Số công chuẩn của các ngày làm việc tính tới hôm nay
              */
             expected_credit: number;
         };
@@ -3417,7 +3417,7 @@ export interface components {
             assigned_shift_id: number | null;
             /**
              * Work Days
-             * @description Số ngày làm việc đã qua trong tháng theo ca của người này
+             * @description Số ngày làm việc trong tháng tính tới hôm nay, theo ca của người này
              */
             work_days: number;
             /** Present Days */
@@ -3443,7 +3443,7 @@ export interface components {
             credit: number;
             /**
              * Expected Credit
-             * @description Số công chuẩn của các ngày làm việc đã qua
+             * @description Số công chuẩn của các ngày làm việc tính tới hôm nay
              */
             expected_credit: number;
         };

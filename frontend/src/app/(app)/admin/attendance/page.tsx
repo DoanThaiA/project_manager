@@ -477,13 +477,13 @@ function SummaryTab({ month, data, loading }: { month: string; data?: Attendance
             <tr>
               <th>Nhân viên</th>
               <th>Ca</th>
-              <th className="text-right">Có mặt</th>
-              <th className="text-right">Vắng</th>
-              <th className="text-right">Đi muộn</th>
-              <th className="text-right">Về sớm</th>
-              <th className="text-right">Thiếu check-out</th>
-              <th className="text-right">Giờ làm</th>
-              <th className="text-right">Công</th>
+              <th className="!text-right">Có mặt</th>
+              <th className="!text-right">Vắng</th>
+              <th className="!text-right">Đi muộn</th>
+              <th className="!text-right">Về sớm</th>
+              <th className="!text-right">Thiếu check-out</th>
+              <th className="!text-right">Giờ làm</th>
+              <th className="!text-right">Công</th>
             </tr>
           </thead>
           <tbody>
@@ -579,7 +579,7 @@ function ShiftsTab({
             <th>Ca</th>
             <th>Lịch trong tuần</th>
             <th>Cho phép muộn</th>
-            <th className="text-right">Số người gán</th>
+            <th className="!text-right">Số người gán</th>
             <th className="w-20" />
           </tr>
         </thead>

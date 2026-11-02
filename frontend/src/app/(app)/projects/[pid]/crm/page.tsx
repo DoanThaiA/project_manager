@@ -216,7 +216,7 @@ function ContactsView({ pid, stats, onOpen }: { pid: number; stats?: CrmStats; o
               <th>Khách</th>
               <th>Công ty · SĐT</th>
               <th>Nhu cầu</th>
-              <th className="text-right">Email</th>
+              <th className="!text-right">Email</th>
               <th>Liên hệ cuối</th>
               <th>Trạng thái</th>
               <th>Phụ trách</th>

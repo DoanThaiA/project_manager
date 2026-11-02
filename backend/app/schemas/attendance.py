@@ -192,7 +192,7 @@ class MonthOut(BaseModel):
     absent_days: int
     worked_minutes: int
     credit: float = Field(description="Số công thực tế")
-    expected_credit: float = Field(description="Số công chuẩn của các ngày làm việc đã qua")
+    expected_credit: float = Field(description="Số công chuẩn của các ngày làm việc tính tới hôm nay")
 
 
 class RecordCreate(BaseModel):
@@ -217,7 +217,7 @@ class SummaryRow(BaseModel):
     user: UserBrief
     shift: ShiftBrief = Field(description="Ca đang áp dụng (ca được gán, hoặc ca mặc định)")
     assigned_shift_id: int | None = Field(description="Ca được gán riêng; null = dùng ca mặc định")
-    work_days: int = Field(description="Số ngày làm việc đã qua trong tháng theo ca của người này")
+    work_days: int = Field(description="Số ngày làm việc trong tháng tính tới hôm nay, theo ca của người này")
     present_days: int
     late_count: int
     late_minutes: int
@@ -227,7 +227,7 @@ class SummaryRow(BaseModel):
     absent_days: int
     worked_minutes: int
     credit: float = Field(description="Số công thực tế")
-    expected_credit: float = Field(description="Số công chuẩn của các ngày làm việc đã qua")
+    expected_credit: float = Field(description="Số công chuẩn của các ngày làm việc tính tới hôm nay")
 
 
 class SummaryOut(BaseModel):

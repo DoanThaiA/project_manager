@@ -86,12 +86,12 @@ export default function TimesheetPage() {
               <tr>
                 <th>Dự án</th>
                 {days.map((d) => (
-                  <th key={d.toISOString()} className={cn("text-center", isToday(d) && "!text-brand")}>
+                  <th key={d.toISOString()} className={cn("!text-center", isToday(d) && "!text-brand")}>
                     <span className="block capitalize">{format(d, "EEE", { locale: vi })}</span>
                     <span className="font-normal">{format(d, "dd/MM")}</span>
                   </th>
                 ))}
-                <th className="text-right">Tổng</th>
+                <th className="!text-right">Tổng</th>
               </tr>
             </thead>
             <tbody>

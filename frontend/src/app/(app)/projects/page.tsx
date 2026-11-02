@@ -73,7 +73,7 @@ export default function ProjectsPage() {
                 <th>Trạng thái</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
-                <th className="text-right">Sprint</th>
+                <th className="!text-right">Sprint</th>
               </tr>
             </thead>
             <tbody>

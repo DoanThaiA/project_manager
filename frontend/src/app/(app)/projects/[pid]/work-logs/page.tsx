@@ -145,7 +145,7 @@ export default function WorkLogsPage() {
               <tr>
                 <th>Ngày</th>
                 <th>Thành viên</th>
-                <th className="text-right">Giờ</th>
+                <th className="!text-right">Giờ</th>
                 <th>Nội dung</th>
                 <th>Loại</th>
                 <th className="w-20" />

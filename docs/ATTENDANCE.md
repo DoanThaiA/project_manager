@@ -167,8 +167,8 @@ Có sẵn 2 ca:
   chấm. **Gán ca cho user có hiệu lực từ hôm nay**: nếu hôm nay đã chấm thì công hôm nay được tính lại theo ca mới;
   các ngày trước giữ ca lúc chấm. Sửa lịch của một ca chỉ áp dụng cho lần chấm sau. Admin sửa công thì được chọn lại
   ca cho ngày đó và hệ thống tính lại.
-- Tổng hợp tháng: **công chuẩn** = tổng công các ngày làm việc đã qua theo **ca hiện tại** của từng người;
-  **công thực tế** = tổng `credit` các bản ghi. Ngày làm việc không có bản ghi là *vắng*.
+- Tổng hợp tháng: **công chuẩn** = tổng công các ngày làm việc tính tới hôm nay theo **ca hiện tại** của từng người;
+  **công thực tế** = tổng `credit` các bản ghi. Ngày làm việc **đã qua** không có bản ghi là *vắng* (hôm nay chưa tính vắng).
 
 ### 2.3 `attendance_records`: bảng công, mỗi người một dòng mỗi ngày
 

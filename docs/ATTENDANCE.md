@@ -164,7 +164,8 @@ Có sẵn 2 ca:
   của ngày đó (1 hoặc 0,5). Đi muộn / về sớm **không trừ công** (đã có số phút riêng để xử lý theo quy chế).
   Thiếu check-out thì 0 công cho tới khi quản lý sửa giờ về.
 - Mỗi bản ghi lưu **ca lúc chấm** (`shift_id`); số phút muộn / về sớm / giờ làm / công được tính và lưu ngay lúc
-  chấm. Đổi ca của user, hay sửa lịch của ca, chỉ áp dụng cho lần chấm sau. Admin sửa công thì được chọn lại
+  chấm. **Gán ca cho user có hiệu lực từ hôm nay**: nếu hôm nay đã chấm thì công hôm nay được tính lại theo ca mới;
+  các ngày trước giữ ca lúc chấm. Sửa lịch của một ca chỉ áp dụng cho lần chấm sau. Admin sửa công thì được chọn lại
   ca cho ngày đó và hệ thống tính lại.
 - Tổng hợp tháng: **công chuẩn** = tổng công các ngày làm việc đã qua theo **ca hiện tại** của từng người;
   **công thực tế** = tổng `credit` các bản ghi. Ngày làm việc không có bản ghi là *vắng*.
@@ -312,7 +313,7 @@ không tạo hai bản ghi.
 |---|---|---|
 | `GET /shifts` | view | Các ca, kèm số người được gán |
 | `POST /shifts`, `PUT /shifts/{id}`, `DELETE /shifts/{id}` | manage | Thêm / sửa / xoá ca. Gửi đủ trường kèm `days` (lịch từng thứ); thứ không có trong `days` = ngày nghỉ |
-| `PUT /users/{user_id}/shift` | manage | Body `{ "shift_id": int \| null }`: gán ca cho user, `null` = ca mặc định |
+| `PUT /users/{user_id}/shift` | manage | Body `{ "shift_id": int \| null }`: gán ca cho user, `null` = ca mặc định. Có hiệu lực từ hôm nay (tính lại công hôm nay nếu đã chấm) |
 | `GET /networks`, `POST /networks`, `PATCH/DELETE /networks/{id}` | manage | Mạng văn phòng |
 | `POST /networks/current-ip` | manage | Body `{ "name": str }`: thêm IP đang dùng. IPv4 → `/32`, IPv6 → `/64` |
 | `GET /records?from&to&user_id&status` | view | Bảng công, phân trang như các API khác |

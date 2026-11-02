@@ -577,7 +577,7 @@ async def delete_shift(
     "/users/{user_id}/shift",
     response_model=UserShiftOut,
     summary="Gán ca cho nhân viên (null = ca mặc định)",
-    description="Áp dụng từ lần chấm tiếp theo; bản ghi cũ giữ ca lúc chấm.",
+    description="Có hiệu lực từ hôm nay (công hôm nay đã chấm được tính lại theo ca mới); ngày trước giữ ca lúc chấm.",
 )
 async def assign_shift(
     user_id: int,
@@ -592,6 +592,9 @@ async def assign_shift(
     if body.shift_id is not None:
         _shift_by_id(shifts, body.shift_id)
     target.attendance_shift_id = body.shift_id
+    # Có hiệu lực từ hôm nay: đã chấm trước khi đổi ca thì tính lại công hôm nay theo ca mới
+    if record := await _today_record(db, user_id, work_date_of(await _db_now(db))):
+        recompute(record, shifts.of_user(target))
     await db.commit()
     return UserShiftOut(
         user_id=user_id,

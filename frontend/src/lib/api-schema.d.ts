@@ -565,7 +565,7 @@ export interface paths {
         get?: never;
         /**
          * Gán ca cho nhân viên (null = ca mặc định)
-         * @description Áp dụng từ lần chấm tiếp theo; bản ghi cũ giữ ca lúc chấm.
+         * @description Có hiệu lực từ hôm nay (công hôm nay đã chấm được tính lại theo ca mới); ngày trước giữ ca lúc chấm.
          */
         put: operations["assign_shift_api_v1_attendance_users__user_id__shift_put"];
         post?: never;

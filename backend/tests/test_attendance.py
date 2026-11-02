@@ -411,3 +411,23 @@ async def test_shifts_and_assignment(client, login, office):
         f"/attendance/users/{uid}/shift", json={"shift_id": None}, headers=await login("dev.cuong")
     )
     assert staff.status_code == 403
+
+
+async def test_assign_shift_applies_to_today_record(client, login, office):
+    """Đã check-in rồi mới được gán ca: công hôm nay chuyển sang ca mới ngay."""
+    headers = await login("admin")
+    staff = await login("qa.dung")
+    shifts = {s["name"]: s for s in (await client.get("/attendance/shifts", headers=headers)).json()}
+    checked = await client.post("/attendance/check-in", headers={**staff, **_from(OFFICE_IP)})
+    assert checked.status_code == 200, checked.text
+    assert checked.json()["shift"]["name"] == "Hành chính"
+
+    uid = await _user_id(client, login, "qa.dung")
+    await client.put(f"/attendance/users/{uid}/shift", json={"shift_id": shifts["Ca sáng"]["id"]}, headers=headers)
+    today = (await client.get("/attendance/me/today", headers=staff)).json()
+    assert today["shift"]["name"] == "Ca sáng"
+    assert today["record"]["shift"]["name"] == "Ca sáng"
+
+    await client.put(f"/attendance/users/{uid}/shift", json={"shift_id": None}, headers=headers)
+    today = (await client.get("/attendance/me/today", headers=staff)).json()
+    assert today["record"]["shift"]["name"] == "Hành chính"

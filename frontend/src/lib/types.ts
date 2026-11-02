@@ -63,3 +63,12 @@ export type MyTelegram = S["MyTelegramOut"];
 export type ProjectTelegram = S["ProjectTelegramOut"];
 export type NotificationSubscription = S["SubscriptionOut"];
 export type NotificationEvent = NotificationSubscription["event"];
+
+export type AttendanceNetwork = S["NetworkOut"];
+export type AttendanceRecord = S["RecordOut"];
+export type AttendanceToday = S["TodayOut"];
+export type AttendanceMonth = S["MonthOut"];
+export type AttendanceDay = S["DayOut"];
+export type AttendanceSummary = S["SummaryOut"];
+export type AttendanceEvent = S["EventOut"];
+export type MyIp = S["MyIpOut"];

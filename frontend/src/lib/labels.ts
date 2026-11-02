@@ -159,6 +159,8 @@ export const ENTITY_LABEL: Record<string, string> = {
   work_logs: "Log công việc",
   attachments: "File đính kèm",
   crm_contacts: "Khách liên hệ (CRM)",
+  attendance_networks: "Mạng chấm công",
+  attendance_records: "Bảng công",
 };
 
 export const FIELD_LABEL: Record<string, string> = {
@@ -212,6 +214,15 @@ export const FIELD_LABEL: Record<string, string> = {
   company: "Công ty",
   address: "Địa chỉ",
   note: "Ghi chú",
+  cidr: "IP / dải IP",
+  is_active: "Đang bật",
+  check_in_at: "Giờ vào",
+  check_out_at: "Giờ về",
+  late_minutes: "Phút đi muộn",
+  early_leave_minutes: "Phút về sớm",
+  worked_minutes: "Phút làm việc",
+  adjusted_reason: "Lý do chỉnh công",
+  source: "Nguồn",
 };
 
 export function labelOf(map: Record<string, string>, key: string) {

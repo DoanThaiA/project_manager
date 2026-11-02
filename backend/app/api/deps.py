@@ -1,3 +1,4 @@
+import ipaddress
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -7,6 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import PAT_PREFIX, decode_access_token, hash_api_token
 from app.db.session import get_db
 from app.models import ApiToken, Permission, Project, User
@@ -14,11 +16,34 @@ from app.models import ApiToken, Permission, Project, User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
+_TRUSTED_PROXIES = [ipaddress.ip_network(n) for n in settings.trusted_proxies]
+
+
+def _parse_ip(raw: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        ip = ipaddress.ip_address(raw.strip())
+    except ValueError:
+        return None
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:  # ::ffff:1.2.3.4 -> 1.2.3.4
+        return ip.ipv4_mapped
+    return ip
+
+
 def client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
+    """IP client: duyệt X-Forwarded-For + IP kết nối từ phải sang trái, bỏ qua proxy tin cậy (nginx, Next.js,
+    mạng docker). Giá trị client tự đặt luôn nằm bên trái IP thật nên không thể giả IP (docs/ATTENDANCE.md mục 1)."""
+    chain = [p for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    if request.client:
+        chain.append(request.client.host)
+    found: str | None = None
+    for raw in reversed(chain):
+        ip = _parse_ip(raw)
+        if ip is None:  # giá trị rác: dừng, lấy IP hợp lệ ngay bên phải
+            break
+        found = str(ip)
+        if not any(ip in net for net in _TRUSTED_PROXIES):
+            break
+    return found
 
 
 async def user_from_api_token(db: AsyncSession, token: str) -> User | None:

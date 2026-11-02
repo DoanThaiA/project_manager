@@ -92,7 +92,7 @@ server {
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;   # backend ghi IP thật vào nhật ký
+        proxy_set_header X-Forwarded-For $remote_addr;   # ghi đè: IP thật cho nhật ký + chấm công (docs/ATTENDANCE.md)
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
@@ -101,6 +101,10 @@ server {
 ```bash
 sudo certbot --nginx -d pm.congty.vn
 ```
+
+Domain đi qua Cloudflare proxy (đám mây cam) thì cấu hình thêm `real_ip` để `$remote_addr` là IP thật của
+người dùng, không phải IP Cloudflare — xem [ATTENDANCE.md](ATTENDANCE.md) mục 1.1. Thiếu bước này thì chấm
+công từ chối mọi người.
 
 ## 7. Backup riêng database `project_manager`
 

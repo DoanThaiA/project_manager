@@ -369,6 +369,240 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attendance/my-ip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IP server thấy + mạng công ty khớp (kiểm tra cấu hình) */
+        get: operations["my_ip_api_v1_attendance_my_ip_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/me/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái chấm công hôm nay của tôi */
+        get: operations["my_today_api_v1_attendance_me_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check-in (chỉ từ mạng công ty)
+         * @description Đã check-in hôm nay thì trả bản ghi cũ, giữ giờ vào đầu tiên.
+         */
+        post: operations["check_in_api_v1_attendance_check_in_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check-out (chỉ từ mạng công ty)
+         * @description Check-out nhiều lần thì giữ lần cuối. Chưa check-in hôm nay -> 409.
+         */
+        post: operations["check_out_api_v1_attendance_check_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/me/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch công một tháng của tôi */
+        get: operations["my_records_api_v1_attendance_me_records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mạng công ty được phép chấm công */
+        get: operations["list_networks_api_v1_attendance_networks_get"];
+        put?: never;
+        /** Create Network */
+        post: operations["create_network_api_v1_attendance_networks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/networks/current-ip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Thêm IP tôi đang dùng (bấm khi đang ở văn phòng)
+         * @description IPv4 -> /32, IPv6 -> /64.
+         */
+        post: operations["create_network_from_current_ip_api_v1_attendance_networks_current_ip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/networks/{network_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Network */
+        delete: operations["delete_network_api_v1_attendance_networks__network_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Network */
+        patch: operations["update_network_api_v1_attendance_networks__network_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/attendance/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng công của mọi người */
+        get: operations["list_records_api_v1_attendance_records_get"];
+        put?: never;
+        /** Thêm công cho ngày nhân viên quên chấm (bắt buộc lý do) */
+        post: operations["create_record_api_v1_attendance_records_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/records/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Record */
+        delete: operations["delete_record_api_v1_attendance_records__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Sửa giờ vào / về (bắt buộc lý do) */
+        patch: operations["update_record_api_v1_attendance_records__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/attendance/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp công theo người trong tháng */
+        get: operations["summary_api_v1_attendance_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải tổng hợp tháng dạng CSV (mở bằng Excel) */
+        get: operations["export_summary_api_v1_attendance_summary_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Log các lần bấm chấm công (kể cả bị từ chối) */
+        get: operations["list_events_api_v1_attendance_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -1458,6 +1692,11 @@ export interface components {
             /** Error */
             error: string | null;
         };
+        /** CheckBody */
+        CheckBody: {
+            /** Note */
+            note?: string | null;
+        };
         /** CommentCreate */
         CommentCreate: {
             /** Content */
@@ -1914,6 +2153,45 @@ export interface components {
             note?: string | null;
             status?: components["schemas"]["CustomerStatus"] | null;
         };
+        /** DayOut */
+        DayOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Is Work Day */
+            is_work_day: boolean;
+            /**
+             * Absent
+             * @description Ngày làm việc đã qua mà không có bản ghi
+             */
+            absent: boolean;
+            record: components["schemas"]["RecordOut"] | null;
+        };
+        /** EventOut */
+        EventOut: {
+            /** Id */
+            id: number;
+            user?: components["schemas"]["UserBrief"] | null;
+            /** Action */
+            action: string;
+            /** Accepted */
+            accepted: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Ip */
+            ip: string | null;
+            /** Network Id */
+            network_id: number | null;
+            /** User Agent */
+            user_agent: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1979,12 +2257,109 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** MonthOut */
+        MonthOut: {
+            /** Month */
+            month: string;
+            /** Days */
+            days: components["schemas"]["DayOut"][];
+            /** Present Days */
+            present_days: number;
+            /** Late Count */
+            late_count: number;
+            /** Early Leave Count */
+            early_leave_count: number;
+            /** Missing Checkout Count */
+            missing_checkout_count: number;
+            /** Absent Days */
+            absent_days: number;
+            /** Worked Minutes */
+            worked_minutes: number;
+        };
+        /** MyIpOut */
+        MyIpOut: {
+            /** Ip */
+            ip: string | null;
+            network: components["schemas"]["NetworkBrief"] | null;
+            /**
+             * X Forwarded For
+             * @description Chỉ hiện với attendance.manage, để dò cấu hình proxy
+             */
+            x_forwarded_for?: string | null;
+            /** Client Host */
+            client_host?: string | null;
+        };
         /** MyTelegramOut */
         MyTelegramOut: {
             /** Configured */
             configured: boolean;
             bot: components["schemas"]["BotStatusOut"];
             chat: components["schemas"]["TelegramChatOut"] | null;
+        };
+        /** NetworkBrief */
+        NetworkBrief: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** NetworkCreate */
+        NetworkCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Cidr
+             * @description IP (113.161.10.20) hoặc dải IP (113.161.10.16/29, 2402:800:1234::/56)
+             */
+            cidr: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** NetworkFromCurrentIp */
+        NetworkFromCurrentIp: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** NetworkOut */
+        NetworkOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Cidr */
+            cidr: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** NetworkUpdate */
+        NetworkUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Cidr */
+            cidr?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Note */
+            note?: string | null;
         };
         /**
          * NotificationEvent
@@ -2041,10 +2416,32 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** Page[EventOut] */
+        Page_EventOut_: {
+            /** Items */
+            items: components["schemas"]["EventOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
         /** Page[ProjectOut] */
         Page_ProjectOut_: {
             /** Items */
             items: components["schemas"]["ProjectOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /** Page[RecordOut] */
+        Page_RecordOut_: {
+            /** Items */
+            items: components["schemas"]["RecordOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -2253,6 +2650,103 @@ export interface components {
             sprint_duration_days?: number | null;
             /** Budget Hours */
             budget_hours?: number | string | null;
+        };
+        /** RecordCreate */
+        RecordCreate: {
+            /** User Id */
+            user_id: number;
+            /**
+             * Work Date
+             * Format: date
+             */
+            work_date: string;
+            /**
+             * Check In Time
+             * Format: time
+             * @description Giờ vào (giờ Việt Nam)
+             */
+            check_in_time: string;
+            /** Check Out Time */
+            check_out_time?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Adjusted Reason
+             * @description Lý do thêm / sửa công (bắt buộc)
+             */
+            adjusted_reason: string;
+        };
+        /** RecordOut */
+        RecordOut: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            user?: components["schemas"]["UserBrief"] | null;
+            /**
+             * Work Date
+             * Format: date
+             */
+            work_date: string;
+            /**
+             * Check In At
+             * Format: date-time
+             */
+            check_in_at: string;
+            /** Check In Ip */
+            check_in_ip: string | null;
+            check_in_network?: components["schemas"]["NetworkBrief"] | null;
+            /** Check Out At */
+            check_out_at: string | null;
+            /** Check Out Ip */
+            check_out_ip: string | null;
+            check_out_network?: components["schemas"]["NetworkBrief"] | null;
+            /** Late Minutes */
+            late_minutes: number;
+            /** Early Leave Minutes */
+            early_leave_minutes: number;
+            /** Worked Minutes */
+            worked_minutes: number | null;
+            /** Source */
+            source: string;
+            /** Note */
+            note: string | null;
+            /** Adjusted By */
+            adjusted_by: number | null;
+            /** Adjusted Reason */
+            adjusted_reason: string | null;
+            /**
+             * Is Late
+             * @default false
+             */
+            is_late: boolean;
+            /**
+             * Is Early Leave
+             * @default false
+             */
+            is_early_leave: boolean;
+            /**
+             * Missing Checkout
+             * @default false
+             */
+            missing_checkout: boolean;
+        };
+        /** RecordUpdate */
+        RecordUpdate: {
+            /** Check In Time */
+            check_in_time?: string | null;
+            /**
+             * Check Out Time
+             * @description null = xoá giờ về
+             */
+            check_out_time?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Adjusted Reason
+             * @description Lý do thêm / sửa công (bắt buộc)
+             */
+            adjusted_reason: string;
         };
         /** RequirementCreate */
         RequirementCreate: {
@@ -2557,6 +3051,35 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** ShiftOut */
+        ShiftOut: {
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /**
+             * Break Start
+             * Format: time
+             */
+            break_start: string;
+            /**
+             * Break End
+             * Format: time
+             */
+            break_end: string;
+            /** Late Grace Minutes */
+            late_grace_minutes: number;
+            /** Early Grace Minutes */
+            early_grace_minutes: number;
+            /** Work Days */
+            work_days: number[];
+        };
         /** SprintComplete */
         SprintComplete: {
             /**
@@ -2723,6 +3246,38 @@ export interface components {
              */
             statuses: string[];
         };
+        /** SummaryOut */
+        SummaryOut: {
+            /** Month */
+            month: string;
+            /**
+             * Work Days
+             * @description Số ngày làm việc của tháng (tính tới hôm qua nếu là tháng hiện tại)
+             */
+            work_days: number;
+            /** Rows */
+            rows: components["schemas"]["SummaryRow"][];
+        };
+        /** SummaryRow */
+        SummaryRow: {
+            user: components["schemas"]["UserBrief"];
+            /** Present Days */
+            present_days: number;
+            /** Late Count */
+            late_count: number;
+            /** Late Minutes */
+            late_minutes: number;
+            /** Early Leave Count */
+            early_leave_count: number;
+            /** Early Leave Minutes */
+            early_leave_minutes: number;
+            /** Missing Checkout Count */
+            missing_checkout_count: number;
+            /** Absent Days */
+            absent_days: number;
+            /** Worked Minutes */
+            worked_minutes: number;
+        };
         /** TelegramChatOut */
         TelegramChatOut: {
             /** Id */
@@ -2760,6 +3315,25 @@ export interface components {
          * @enum {string}
          */
         TextFileFolder: "work-items" | "requirements" | "requirement-comments" | "requirement-status" | "work-logs" | "sprints" | "other";
+        /** TodayOut */
+        TodayOut: {
+            /**
+             * Work Date
+             * Format: date
+             */
+            work_date: string;
+            /** Is Work Day */
+            is_work_day: boolean;
+            /** Ip */
+            ip: string | null;
+            network: components["schemas"]["NetworkBrief"] | null;
+            shift: components["schemas"]["ShiftOut"];
+            record: components["schemas"]["RecordOut"] | null;
+            /** Can Check In */
+            can_check_in: boolean;
+            /** Can Check Out */
+            can_check_out: boolean;
+        };
         /** Token */
         Token: {
             /** Access Token */
@@ -4009,6 +4583,525 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_ip_api_v1_attendance_my_ip_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyIpOut"];
+                };
+            };
+        };
+    };
+    my_today_api_v1_attendance_me_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+        };
+    };
+    check_in_api_v1_attendance_check_in_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CheckBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_out_api_v1_attendance_check_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CheckBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_records_api_v1_attendance_me_records_get: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_networks_api_v1_attendance_networks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"][];
+                };
+            };
+        };
+    };
+    create_network_api_v1_attendance_networks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_network_from_current_ip_api_v1_attendance_networks_current_ip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkFromCurrentIp"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_network_api_v1_attendance_networks__network_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                network_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_network_api_v1_attendance_networks__network_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                network_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_records_api_v1_attendance_records_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                user_id?: number | null;
+                flag?: ("late" | "early_leave" | "missing_checkout") | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RecordOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_record_api_v1_attendance_records_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_record_api_v1_attendance_records__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_record_api_v1_attendance_records__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_v1_attendance_summary_get: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_summary_api_v1_attendance_summary_export_get: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_api_v1_attendance_events_get: {
+        parameters: {
+            query?: {
+                user_id?: number | null;
+                accepted?: boolean | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_EventOut_"];
                 };
             };
             /** @description Validation Error */

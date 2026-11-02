@@ -26,7 +26,7 @@ cp .env.example .env            # điền PM_DB_PASSWORD, SECRET_KEY (giá trị
 ./scripts/init_db.sh --demo     # tạo user + database, chạy migration Alembic (+ dữ liệu mẫu)
 ```
 
-Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Kết nối AI (MCP, connector URL) cho ban lãnh đạo: xem [docs/MCP.md](docs/MCP.md). Nhận email khách từ Gmail qua n8n vào CRM dự án: xem [docs/CRM_N8N.md](docs/CRM_N8N.md). Chấm công theo IP mạng công ty: xem [docs/ATTENDANCE.md](docs/ATTENDANCE.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
+Triển khai lên server: xem [docs/DEPLOY.md](docs/DEPLOY.md). Kết nối AI (MCP, connector URL) cho ban lãnh đạo: xem [docs/MCP.md](docs/MCP.md). Nhận email khách từ Gmail qua n8n vào CRM dự án: xem [docs/CRM_N8N.md](docs/CRM_N8N.md). Chấm công theo IP mạng công ty: xem [docs/ATTENDANCE.md](docs/ATTENDANCE.md). AI Gateway (dự án gọi Anthropic / OpenAI bằng key riêng, có hạn mức): xem [docs/LLM_GATEWAY.md](docs/LLM_GATEWAY.md). Tạo tài khoản quản trị đầu tiên (production không nạp dữ liệu mẫu):
 `docker compose exec api python -m app.cli create-admin --username admin --email … --full-name "…"`
 
 Script không xoá dữ liệu có sẵn; dữ liệu mẫu chỉ nạp khi database còn trống.
@@ -101,6 +101,7 @@ Frontend chạy phía client sau đăng nhập (JWT trong localStorage). Ẩn/hi
 | `/attendance` | Chấm công của tôi: check-in / check-out từ mạng công ty, lịch công tháng |
 | `/customers` | Khách hàng & người liên hệ |
 | `/admin/users`, `/admin/roles`, `/admin/activity` | Người dùng, ma trận phân quyền, nhật ký hệ thống |
+| `/admin/llm` | AI Gateway: sử dụng & chi phí, key dự án (hạn mức), key nhà cung cấp, model & giá |
 | `/admin/attendance` | Chấm công: bảng công (thêm / sửa có lý do), tổng hợp tháng + công + CSV, ca làm việc (lịch theo thứ) + phân ca, mạng công ty, lần bị từ chối |
 
 ## API (`/api/v1`)
@@ -119,6 +120,7 @@ Xác thực bằng JWT Bearer: `POST /auth/login` (form `username`, `password`) 
 | Backlog | `/projects/{pid}/work-items` (lọc `backlog=true`, `sprint_id`, `status`, `assignee_id` = công việc có người này trong danh sách phụ trách…) |
 | Log công việc | `/projects/{pid}/work-logs`, `GET /me/work-logs` |
 | Chấm công | `POST /attendance/check-in` `/check-out`, `GET /attendance/me/today`, `GET /attendance/me/records?month=`, `GET /attendance/my-ip`, `/attendance/shifts`, `PUT /attendance/users/{id}/shift`, `/attendance/networks` (+ `POST …/current-ip`), `/attendance/records`, `GET /attendance/summary` (+ `/export`), `GET /attendance/events` |
+| AI Gateway (quản trị) | `/llm/provider-keys` (+ `/{id}/test`), `/llm/models`, `/llm/client-keys` (+ `/{id}/revoke`), `GET /llm/usage/summary`, `GET /llm/usage/logs` |
 | CRM | `POST /projects/{pid}/crm/emails/ingest` (n8n), `GET /projects/{pid}/crm/stats`, `/projects/{pid}/crm/contacts`, `GET/PATCH/DELETE …/contacts/{id}`, `GET /projects/{pid}/crm/emails` (lọc `contact_id`, `inquiry_type`, ngày), `GET/DELETE …/emails/{id}` |
 | Báo cáo & nhật ký | `GET /projects/{pid}/reports/summary`, `GET /projects/{pid}/reports/work-logs?group_by=user\|date\|activity_type\|work_item\|sprint`, `GET /projects/{pid}/activity-logs`, `GET /activity-logs` |
 

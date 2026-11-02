@@ -662,6 +662,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/llm/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gateway Status */
+        get: operations["gateway_status_api_v1_llm_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/provider-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Provider Keys */
+        get: operations["list_provider_keys_api_v1_llm_provider_keys_get"];
+        put?: never;
+        /** Create Provider Key */
+        post: operations["create_provider_key_api_v1_llm_provider_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/provider-keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Provider Key */
+        delete: operations["delete_provider_key_api_v1_llm_provider_keys__key_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Provider Key */
+        patch: operations["update_provider_key_api_v1_llm_provider_keys__key_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/llm/provider-keys/{key_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gọi thử danh sách model */
+        post: operations["test_provider_key_api_v1_llm_provider_keys__key_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_api_v1_llm_models_get"];
+        put?: never;
+        /** Create Model */
+        post: operations["create_model_api_v1_llm_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/models/{model_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Model */
+        put: operations["update_model_api_v1_llm_models__model_id__put"];
+        post?: never;
+        /** Delete Model */
+        delete: operations["delete_model_api_v1_llm_models__model_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/client-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Client Keys */
+        get: operations["list_client_keys_api_v1_llm_client_keys_get"];
+        put?: never;
+        /** Cấp key cho dự án (key đầy đủ chỉ trả về một lần) */
+        post: operations["create_client_key_api_v1_llm_client_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/client-keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Client Key */
+        patch: operations["update_client_key_api_v1_llm_client_keys__key_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/llm/client-keys/{key_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi key (không khôi phục) */
+        post: operations["revoke_client_key_api_v1_llm_client_keys__key_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/usage/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Token + chi phí theo key dự án, model, ngày */
+        get: operations["usage_summary_api_v1_llm_usage_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/usage/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Từng request qua gateway */
+        get: operations["usage_logs_api_v1_llm_usage_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -1544,6 +1736,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/llm/{provider}/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model key này được dùng (định dạng của nhà cung cấp) */
+        get: operations["list_models_llm__provider__v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/llm/{provider}/v1/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chuyển tiếp request tới nhà cung cấp */
+        post: operations["proxy_llm__provider__v1__path__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1755,6 +1981,118 @@ export interface components {
         CheckBody: {
             /** Note */
             note?: string | null;
+        };
+        /** ClientKeyCreate */
+        ClientKeyCreate: {
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id?: number | null;
+            /**
+             * Allowed Models
+             * @description Rỗng = mọi model đang bật
+             */
+            allowed_models?: string[];
+            /**
+             * Monthly Budget Usd
+             * @description Hạn mức USD / tháng; null = không giới hạn
+             */
+            monthly_budget_usd?: number | null;
+            /**
+             * Rpm Limit
+             * @description Request / phút; null = không giới hạn
+             */
+            rpm_limit?: number | null;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** ClientKeyCreated */
+        ClientKeyCreated: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: number | null;
+            project?: components["schemas"]["ProjectBrief"] | null;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Allowed Models */
+            allowed_models: string[];
+            /** Monthly Budget Usd */
+            monthly_budget_usd: number | null;
+            /** Rpm Limit */
+            rpm_limit: number | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Spent This Month
+             * @default 0
+             */
+            spent_this_month: number;
+            /**
+             * Key
+             * @description Key đầy đủ, CHỈ hiện một lần
+             */
+            key: string;
+        };
+        /** ClientKeyOut */
+        ClientKeyOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: number | null;
+            project?: components["schemas"]["ProjectBrief"] | null;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Allowed Models */
+            allowed_models: string[];
+            /** Monthly Budget Usd */
+            monthly_budget_usd: number | null;
+            /** Rpm Limit */
+            rpm_limit: number | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Spent This Month
+             * @default 0
+             */
+            spent_this_month: number;
+        };
+        /** ClientKeyUpdate */
+        ClientKeyUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Project Id */
+            project_id?: number | null;
+            /** Allowed Models */
+            allowed_models?: string[] | null;
+            /** Monthly Budget Usd */
+            monthly_budget_usd?: number | null;
+            /** Rpm Limit */
+            rpm_limit?: number | null;
+            /** Expires At */
+            expires_at?: string | null;
         };
         /** CommentCreate */
         CommentCreate: {
@@ -2251,6 +2589,19 @@ export interface components {
              */
             created_at: string;
         };
+        /** GatewayStatus */
+        GatewayStatus: {
+            /**
+             * Enabled
+             * @description Đã đặt LLM_ENCRYPTION_KEY
+             */
+            enabled: boolean;
+            /**
+             * Public Base Url
+             * @description Gốc URL cho base_url của SDK, vd https://<domain>/llm
+             */
+            public_base_url: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2315,6 +2666,65 @@ export interface components {
         Message: {
             /** Detail */
             detail: string;
+        };
+        /** ModelIn */
+        ModelIn: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "anthropic" | "openai";
+            /**
+             * Model
+             * @description Đúng tên model của nhà cung cấp
+             */
+            model: string;
+            /**
+             * Input Price
+             * @description USD / 1 triệu token
+             * @default 0
+             */
+            input_price: number;
+            /**
+             * Output Price
+             * @description USD / 1 triệu token
+             * @default 0
+             */
+            output_price: number;
+            /**
+             * Cache Read Price
+             * @description Bỏ trống = như giá input
+             */
+            cache_read_price?: number | null;
+            /**
+             * Cache Write Price
+             * @description Bỏ trống = như giá input
+             */
+            cache_write_price?: number | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ModelOut */
+        ModelOut: {
+            /** Id */
+            id: number;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Input Price */
+            input_price: number;
+            /** Output Price */
+            output_price: number;
+            /** Cache Read Price */
+            cache_read_price: number | null;
+            /** Cache Write Price */
+            cache_write_price: number | null;
+            /** Is Active */
+            is_active: boolean;
         };
         /** MonthOut */
         MonthOut: {
@@ -2531,6 +2941,17 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** Page[UsageLogOut] */
+        Page_UsageLogOut_: {
+            /** Items */
+            items: components["schemas"]["UsageLogOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
         /** Page[UserOut] */
         Page_UserOut_: {
             /** Items */
@@ -2594,6 +3015,15 @@ export interface components {
          * @enum {string}
          */
         PriorityLevel: "lowest" | "low" | "medium" | "high" | "critical";
+        /** ProjectBrief */
+        ProjectBrief: {
+            /** Id */
+            id: number;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /**
@@ -2721,6 +3151,98 @@ export interface components {
             sprint_duration_days?: number | null;
             /** Budget Hours */
             budget_hours?: number | string | null;
+        };
+        /** ProviderKeyCreate */
+        ProviderKeyCreate: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "anthropic" | "openai";
+            /** Name */
+            name: string;
+            /**
+             * Api Key
+             * @description Key thật; chỉ gửi lên, không bao giờ trả lại
+             */
+            api_key: string;
+            /**
+             * Base Url
+             * @description Bỏ trống = endpoint chính thức
+             */
+            base_url?: string | null;
+            /**
+             * Priority
+             * @description Cao hơn được dùng trước
+             * @default 0
+             */
+            priority: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ProviderKeyOut */
+        ProviderKeyOut: {
+            /** Id */
+            id: number;
+            /** Provider */
+            provider: string;
+            /** Name */
+            name: string;
+            /** Key Hint */
+            key_hint: string;
+            /** Base Url */
+            base_url: string | null;
+            /** Priority */
+            priority: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Cooldown Until */
+            cooldown_until: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Error At */
+            last_error_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ProviderKeyTestOut */
+        ProviderKeyTestOut: {
+            /** Ok */
+            ok: boolean;
+            /** Status Code */
+            status_code: number | null;
+            /** Message */
+            message: string;
+        };
+        /** ProviderKeyUpdate */
+        ProviderKeyUpdate: {
+            /** Name */
+            name?: string | null;
+            /**
+             * Api Key
+             * @description Đổi sang key mới
+             */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Priority */
+            priority?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /**
+             * Reset Cooldown
+             * @description Cho key dùng lại ngay, xoá lỗi gần nhất
+             * @default false
+             */
+            reset_cooldown: boolean;
         };
         /** RecordCreate */
         RecordCreate: {
@@ -3514,6 +4036,224 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /** UsageByDay */
+        UsageByDay: {
+            /**
+             * Requests
+             * @default 0
+             */
+            requests: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+        };
+        /** UsageByKey */
+        UsageByKey: {
+            /**
+             * Requests
+             * @default 0
+             */
+            requests: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
+            /** Client Key Id */
+            client_key_id: number | null;
+            /** Name */
+            name: string | null;
+            project?: components["schemas"]["ProjectBrief"] | null;
+            /** Monthly Budget Usd */
+            monthly_budget_usd?: number | null;
+        };
+        /** UsageByModel */
+        UsageByModel: {
+            /**
+             * Requests
+             * @default 0
+             */
+            requests: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string | null;
+        };
+        /** UsageLogOut */
+        UsageLogOut: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Client Key Id */
+            client_key_id: number | null;
+            /** Client Key Name */
+            client_key_name?: string | null;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string | null;
+            /** Endpoint */
+            endpoint: string;
+            /** Status Code */
+            status_code: number;
+            /** Stream */
+            stream: boolean;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Cache Read Tokens */
+            cache_read_tokens: number;
+            /** Cache Write Tokens */
+            cache_write_tokens: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /** Latency Ms */
+            latency_ms: number | null;
+            /** Error */
+            error: string | null;
+        };
+        /** UsageSummary */
+        UsageSummary: {
+            /** Month */
+            month: string;
+            total: components["schemas"]["UsageTotals"];
+            /** By Key */
+            by_key: components["schemas"]["UsageByKey"][];
+            /** By Model */
+            by_model: components["schemas"]["UsageByModel"][];
+            /** By Day */
+            by_day: components["schemas"]["UsageByDay"][];
+        };
+        /** UsageTotals */
+        UsageTotals: {
+            /**
+             * Requests
+             * @default 0
+             */
+            requests: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
         };
         /** UserBrief */
         UserBrief: {
@@ -5433,6 +6173,477 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_EventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_status_api_v1_llm_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayStatus"];
+                };
+            };
+        };
+    };
+    list_provider_keys_api_v1_llm_provider_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderKeyOut"][];
+                };
+            };
+        };
+    };
+    create_provider_key_api_v1_llm_provider_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderKeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_key_api_v1_llm_provider_keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_provider_key_api_v1_llm_provider_keys__key_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderKeyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_provider_key_api_v1_llm_provider_keys__key_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderKeyTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_v1_llm_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOut"][];
+                };
+            };
+        };
+    };
+    create_model_api_v1_llm_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_model_api_v1_llm_models__model_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_model_api_v1_llm_models__model_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_client_keys_api_v1_llm_client_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientKeyOut"][];
+                };
+            };
+        };
+    };
+    create_client_key_api_v1_llm_client_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientKeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientKeyCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_client_key_api_v1_llm_client_keys__key_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientKeyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_client_key_api_v1_llm_client_keys__key_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_summary_api_v1_llm_usage_summary_get: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_logs_api_v1_llm_usage_logs_get: {
+        parameters: {
+            query?: {
+                client_key_id?: number | null;
+                errors_only?: boolean;
+                day?: string | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_UsageLogOut_"];
                 };
             };
             /** @description Validation Error */
@@ -8109,6 +9320,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ActivityLogOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_llm__provider__v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    proxy_llm__provider__v1__path__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     customers,
     files,
     inline_images,
+    llm,
     notifications,
     projects,
     reports,
@@ -28,6 +29,7 @@ api_router.include_router(api_tokens.router, prefix="/me", tags=["Token truy c�
 api_router.include_router(users.router, prefix="/users", tags=["Người dùng"])
 api_router.include_router(roles.router, tags=["Vai trò & chức năng"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["Chấm công"])
+api_router.include_router(llm.router, prefix="/llm", tags=["AI Gateway"])
 api_router.include_router(customers.router, prefix="/customers", tags=["Khách hàng"])
 api_router.include_router(projects.router, prefix="/projects", tags=["Dự án"])
 api_router.include_router(sprints.router, prefix="/projects/{project_id}/sprints", tags=["Sprint"])

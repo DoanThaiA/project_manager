@@ -145,6 +145,7 @@ export const ACTION_LABEL: Record<string, string> = {
   member_remove: "Bỏ thành viên",
   login: "Đăng nhập",
   login_failed: "Đăng nhập thất bại",
+  revoke: "Thu hồi",
 };
 
 export const ENTITY_LABEL: Record<string, string> = {
@@ -161,6 +162,9 @@ export const ENTITY_LABEL: Record<string, string> = {
   crm_contacts: "Khách liên hệ (CRM)",
   attendance_networks: "Mạng chấm công",
   attendance_records: "Bảng công",
+  llm_provider_keys: "Key nhà cung cấp AI",
+  llm_client_keys: "Key AI của dự án",
+  llm_models: "Model AI",
 };
 
 export const FIELD_LABEL: Record<string, string> = {

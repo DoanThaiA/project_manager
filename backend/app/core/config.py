@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     telegram_poll_seconds: float = 5  # chu kỳ worker xử lý hàng đợi thông báo
     app_public_url: str = "http://localhost:3000"  # để chèn link mở công việc vào tin nhắn
 
+    # AI Gateway (docs/LLM_GATEWAY.md): khoá Fernet mã hoá key nhà cung cấp trong database.
+    # Tạo: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Bỏ trống = tắt gateway. KHÔNG đổi sau khi đã lưu key (đổi là không giải mã được key cũ).
+    llm_encryption_key: str = ""
+    llm_upstream_timeout_seconds: float = 600  # câu trả lời dài / stream
+    llm_anthropic_base_url: str = "https://api.anthropic.com"
+    llm_openai_base_url: str = "https://api.openai.com"
+
     # MCP server cho ban lãnh đạo (kết nối bằng connector URL, xem docs/MCP.md)
     mcp_api_url: str = "http://localhost:8000/api/v1"  # API nội bộ mà MCP server gọi tới
     mcp_port: int = 8001

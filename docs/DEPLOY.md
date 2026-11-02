@@ -95,6 +95,17 @@ server {
         proxy_set_header X-Forwarded-For $remote_addr;   # ghi đè: IP thật cho nhật ký + chấm công (docs/ATTENDANCE.md)
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    # AI Gateway (docs/LLM_GATEWAY.md): đi thẳng tới API, không qua Next.js; tắt buffering để stream
+    location /llm/ {
+        proxy_pass http://127.0.0.1:8000;   # = PM_API_PORT
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 600s;
+    }
 }
 ```
 

@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
+from app.api.llm_proxy import router as llm_proxy_router
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.services.llm_gateway import close_upstream_client
 from app.services.notifications.worker import worker
 
 # Log INFO của ứng dụng (vd: bot Telegram nhận lệnh) ra stdout cùng log uvicorn — xem bằng docker compose logs api
@@ -25,6 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     worker.start()  # thông báo Telegram chạy nền (tắt nếu chưa đặt TELEGRAM_BOT_TOKEN)
     yield
     await worker.stop()
+    await close_upstream_client()
 
 
 app = FastAPI(
@@ -78,3 +81,5 @@ async def health() -> dict[str, str]:
 
 
 app.include_router(api_router, prefix="/api/v1")
+# AI Gateway: SDK Anthropic / OpenAI trỏ base_url vào /llm/... (docs/LLM_GATEWAY.md)
+app.include_router(llm_proxy_router, prefix="/llm", tags=["AI Gateway (proxy)"])

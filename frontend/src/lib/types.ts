@@ -74,3 +74,11 @@ export type AttendanceEvent = S["EventOut"];
 export type MyIp = S["MyIpOut"];
 export type AttendanceShift = S["ShiftOut"];
 export type AttendanceShiftDay = S["ShiftDay"];
+
+export type LlmProviderKey = S["ProviderKeyOut"];
+export type LlmModel = S["ModelOut"];
+export type LlmClientKey = S["ClientKeyOut"];
+export type LlmClientKeyCreated = S["ClientKeyCreated"];
+export type LlmUsageSummary = S["UsageSummary"];
+export type LlmUsageLog = S["UsageLogOut"];
+export type LlmGatewayStatus = S["GatewayStatus"];

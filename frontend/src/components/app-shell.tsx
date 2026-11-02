@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  Bot,
   Building2,
   CalendarCheck,
   ClipboardList,
@@ -41,6 +42,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/admin/users", label: "Người dùng", icon: Users, perm: "user.view" },
   { href: "/admin/roles", label: "Vai trò & quyền", icon: ShieldCheck, perm: "role.manage" },
   { href: "/admin/attendance", label: "Chấm công", icon: Fingerprint, perm: "attendance.view" },
+  { href: "/admin/llm", label: "AI Gateway", icon: Bot, perm: "llm.view" },
   { href: "/admin/activity", label: "Nhật ký hệ thống", icon: History, perm: "activity_log.view" },
 ];
 

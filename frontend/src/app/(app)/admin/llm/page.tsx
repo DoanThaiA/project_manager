@@ -3,7 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, Ban, Copy, KeyRound, Pencil, Plus, Trash2, Zap } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import type {
   LlmClientKeyCreated,
   LlmGatewayStatus,
   LlmModel,
+  LlmProvider,
   LlmProviderKey,
   LlmUsageLog,
   LlmUsageSummary,
@@ -26,10 +27,29 @@ import type {
 } from "@/lib/types";
 import { cn, fmtDate, fmtDateTime, fmtRelative } from "@/lib/utils";
 
-type Tab = "usage" | "clients" | "keys" | "models";
-type Provider = "anthropic" | "openai";
+type Tab = "usage" | "clients" | "providers" | "keys" | "models";
+type ApiFormat = "openai" | "anthropic";
 
-const PROVIDERS: Record<Provider, string> = { anthropic: "Anthropic", openai: "OpenAI" };
+/** Mẫu điền nhanh khi thêm nhà cung cấp; base URL gồm phần phiên bản — kiểm tra lại theo tài liệu của hãng. */
+const PRESETS: { code: string; name: string; api_format: ApiFormat; base_url: string }[] = [
+  { code: "grok", name: "xAI Grok", api_format: "openai", base_url: "https://api.x.ai/v1" },
+  { code: "deepseek", name: "DeepSeek", api_format: "openai", base_url: "https://api.deepseek.com/v1" },
+  { code: "mistral", name: "Mistral", api_format: "openai", base_url: "https://api.mistral.ai/v1" },
+  { code: "groq", name: "Groq", api_format: "openai", base_url: "https://api.groq.com/openai/v1" },
+  { code: "openrouter", name: "OpenRouter", api_format: "openai", base_url: "https://openrouter.ai/api/v1" },
+  {
+    code: "gemini",
+    name: "Google Gemini (tương thích OpenAI)",
+    api_format: "openai",
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
+  },
+  { code: "ollama", name: "Ollama (nội bộ)", api_format: "openai", base_url: "http://localhost:11434/v1" },
+];
+
+/** base_url cho SDK của dự án: định dạng anthropic -> .../llm/{code}; openai -> .../llm/{code}/v1. */
+function sdkBaseUrl(base: string, p: Pick<LlmProvider, "code" | "api_format">) {
+  return p.api_format === "anthropic" ? `${base}/${p.code}` : `${base}/${p.code}/v1`;
+}
 
 function fmtUsd(v?: number | null) {
   const n = v ?? 0;
@@ -40,8 +60,15 @@ function fmtTokens(n?: number | null) {
   return (n ?? 0).toLocaleString("vi-VN");
 }
 
-function providerLabel(p: string) {
-  return PROVIDERS[p as Provider] ?? p;
+function useProviders() {
+  const query = useQuery({
+    queryKey: ["llm", "providers"],
+    queryFn: async () => (await api.get<LlmProvider[]>("/llm/providers")).data,
+  });
+  const byCode = useMemo(() => new Map((query.data ?? []).map((p) => [p.code, p])), [query.data]);
+  /** Tên hiển thị của mã nhà cung cấp. */
+  const label = (code: string) => byCode.get(code)?.name ?? code;
+  return { ...query, providers: query.data ?? [], label };
 }
 
 function useGatewayStatus() {
@@ -67,7 +94,12 @@ export default function LlmGatewayPage() {
   const tabs: [Tab, string][] = [
     ["usage", "Sử dụng & chi phí"],
     ["clients", "Key dự án"],
-    ...(manage ? ([["keys", "Key nhà cung cấp"]] as [Tab, string][]) : []),
+    ...(manage
+      ? ([
+          ["providers", "Nhà cung cấp"],
+          ["keys", "Key nhà cung cấp"],
+        ] as [Tab, string][])
+      : []),
     ["models", "Model & giá"],
   ];
 
@@ -75,7 +107,7 @@ export default function LlmGatewayPage() {
     <>
       <PageHeader
         title="AI Gateway"
-        description="Dự án gọi Anthropic / OpenAI qua gateway bằng key riêng, có hạn mức; key thật chỉ nằm ở đây"
+        description="Dự án gọi Anthropic, OpenAI, Grok… qua gateway bằng key riêng, có hạn mức; key thật chỉ nằm ở đây"
       />
       {status.data && !status.data.enabled && (
         <Card className="mb-4 flex items-start gap-3 border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -106,6 +138,7 @@ export default function LlmGatewayPage() {
         </div>
         {tab === "usage" && <UsageTab />}
         {tab === "clients" && <ClientKeysTab manage={manage} baseUrl={status.data?.public_base_url} />}
+        {tab === "providers" && manage && <ProvidersTab />}
         {tab === "keys" && manage && <ProviderKeysTab />}
         {tab === "models" && <ModelsTab manage={manage} />}
       </Card>
@@ -116,6 +149,7 @@ export default function LlmGatewayPage() {
 // ---------------------------------------------------------------- Sử dụng & chi phí
 
 function UsageTab() {
+  const { label: providerLabel } = useProviders();
   const [month, setMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [page, setPage] = useState(1);
   const summary = useQuery({
@@ -322,8 +356,8 @@ function ClientKeysTab({ manage, baseUrl }: { manage: boolean; baseUrl?: string 
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 text-sm text-ink-3">
         <span>
           SDK trỏ <code className="font-mono text-ink-2">base_url</code> vào{" "}
-          <code className="font-mono text-ink-2">{baseUrl ?? "…/llm"}/anthropic</code> hoặc{" "}
-          <code className="font-mono text-ink-2">{baseUrl ?? "…/llm"}/openai/v1</code>
+          <code className="font-mono text-ink-2">{baseUrl ?? "…/llm"}/&lt;mã nhà cung cấp&gt;</code> (Anthropic) hoặc{" "}
+          <code className="font-mono text-ink-2">…/&lt;mã&gt;/v1</code> (định dạng OpenAI)
         </span>
         {manage && (
           <Button size="sm" variant="primary" className="ml-auto" icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
@@ -423,6 +457,7 @@ function ClientKeyModal({
   const toast = useToast();
   const projects = useProjects();
   const models = useLlmModels();
+  const { label: providerLabel } = useProviders();
   const editing = !!clientKey;
   const [form, setForm] = useState({
     name: clientKey?.name ?? "",
@@ -536,6 +571,7 @@ function ClientKeyModal({
 
 function CreatedKeyModal({ created, baseUrl, onClose }: { created: LlmClientKeyCreated; baseUrl?: string; onClose: () => void }) {
   const toast = useToast();
+  const { providers } = useProviders();
   const base = baseUrl ?? "https://<domain>/llm";
   const copy = async (text: string) => {
     try {
@@ -545,10 +581,14 @@ function CreatedKeyModal({ created, baseUrl, onClose }: { created: LlmClientKeyC
       toast.error("Không copy được, hãy chọn và copy tay");
     }
   };
-  const snippets = [
-    ["Anthropic SDK (Python)", `from anthropic import Anthropic\n\nclient = Anthropic(base_url="${base}/anthropic", api_key="${created.key}")`],
-    ["OpenAI SDK (Python)", `from openai import OpenAI\n\nclient = OpenAI(base_url="${base}/openai/v1", api_key="${created.key}")`],
-  ];
+  // Một đoạn code mẫu cho mỗi nhà cung cấp đang bật: định dạng anthropic dùng Anthropic SDK, còn lại OpenAI SDK
+  const snippets = providers
+    .filter((p) => p.is_active)
+    .map((p) =>
+      p.api_format === "anthropic"
+        ? [`${p.name} · Anthropic SDK (Python)`, `from anthropic import Anthropic\n\nclient = Anthropic(base_url="${sdkBaseUrl(base, p)}", api_key="${created.key}")`]
+        : [`${p.name} · OpenAI SDK (Python)`, `from openai import OpenAI\n\nclient = OpenAI(base_url="${sdkBaseUrl(base, p)}", api_key="${created.key}")`],
+    );
   return (
     <Modal
       open
@@ -585,9 +625,232 @@ function CreatedKeyModal({ created, baseUrl, onClose }: { created: LlmClientKeyC
   );
 }
 
+// ---------------------------------------------------------------- Nhà cung cấp
+
+function ProvidersTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const status = useGatewayStatus();
+  const { providers, isPending } = useProviders();
+  const [editing, setEditing] = useState<LlmProvider | "new" | null>(null);
+  const remove = useMutation({
+    mutationFn: (code: string) => api.delete(`/llm/providers/${code}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["llm", "providers"] });
+      toast.success("Đã xoá nhà cung cấp");
+    },
+    onError: toast.error,
+  });
+  const base = status.data?.public_base_url ?? "…/llm";
+
+  return (
+    <>
+      <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm text-ink-3">
+        <span>
+          Nhà cung cấp dùng định dạng OpenAI (Grok, DeepSeek, OpenRouter, Ollama…) hoặc Anthropic. Mỗi nhà cung cấp có
+          đường dẫn riêng trên gateway.
+        </span>
+        <Button size="sm" variant="primary" className="ml-auto shrink-0" icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
+          Thêm nhà cung cấp
+        </Button>
+      </div>
+      {isPending ? (
+        <Spinner />
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th>Nhà cung cấp</th>
+              <th>Định dạng</th>
+              <th>Base URL</th>
+              <th>base_url cho SDK của dự án</th>
+              <th className="!text-right">Key / Model</th>
+              <th>Trạng thái</th>
+              <th className="w-20" />
+            </tr>
+          </thead>
+          <tbody>
+            {providers.map((p) => (
+              <tr key={p.code}>
+                <td>
+                  <span className="font-medium">{p.name}</span>
+                  <span className="ml-2 font-mono text-xs text-ink-3">{p.code}</span>
+                  {p.is_builtin && (
+                    <Badge tone="indigo" className="ml-2">
+                      Có sẵn
+                    </Badge>
+                  )}
+                </td>
+                <td>{p.api_format === "anthropic" ? "Anthropic" : "OpenAI"}</td>
+                <td className="max-w-64 truncate font-mono text-xs" title={p.base_url}>
+                  {p.base_url}
+                </td>
+                <td className="max-w-64 truncate font-mono text-xs text-ink-2" title={sdkBaseUrl(base, p)}>
+                  {sdkBaseUrl(base, p)}
+                </td>
+                <td className="text-right tabular-nums">
+                  {p.key_count} / {p.model_count}
+                </td>
+                <td>{p.is_active ? <Badge tone="green">Bật</Badge> : <Badge tone="gray">Tắt</Badge>}</td>
+                <td>
+                  <div className="flex justify-end gap-0.5">
+                    <IconButton label="Sửa" onClick={() => setEditing(p)}>
+                      <Pencil className="size-4" />
+                    </IconButton>
+                    {!p.is_builtin && (
+                      <IconButton label="Xoá" onClick={() => confirm(`Xoá nhà cung cấp ${p.name}?`) && remove.mutate(p.code)}>
+                        <Trash2 className="size-4" />
+                      </IconButton>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+      {editing && <ProviderModal provider={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
+    </>
+  );
+}
+
+function ProviderModal({ provider, onClose }: { provider?: LlmProvider; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const editing = !!provider;
+  const [form, setForm] = useState({
+    code: provider?.code ?? "",
+    name: provider?.name ?? "",
+    api_format: (provider?.api_format ?? "openai") as ApiFormat,
+    base_url: provider?.base_url ?? "",
+    extra_headers: Object.entries(provider?.extra_headers ?? {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join("\n"),
+    stream_usage: provider?.stream_usage ?? true,
+    is_active: provider?.is_active ?? true,
+  });
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const applyPreset = (code: string) => {
+    const preset = PRESETS.find((x) => x.code === code);
+    if (preset) setForm((f) => ({ ...f, ...preset }));
+  };
+
+  // "Tên: giá trị" mỗi dòng -> object; dòng sai định dạng thì báo lỗi
+  const headerLines = form.extra_headers.split("\n").map((l) => l.trim()).filter(Boolean);
+  const headersValid = headerLines.every((l) => /^[A-Za-z0-9-]+\s*:\s*\S/.test(l));
+  const save = useMutation({
+    mutationFn: async () => {
+      const body = {
+        name: form.name.trim(),
+        api_format: form.api_format,
+        base_url: form.base_url.trim(),
+        extra_headers: Object.fromEntries(
+          headerLines.map((l) => {
+            const i = l.indexOf(":");
+            return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
+          }),
+        ),
+        stream_usage: form.stream_usage,
+        is_active: form.is_active,
+      };
+      if (editing) await api.put(`/llm/providers/${provider.code}`, body);
+      else await api.post("/llm/providers", { ...body, code: form.code.trim() });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["llm"] });
+      toast.success(editing ? "Đã lưu nhà cung cấp" : "Đã thêm nhà cung cấp");
+      onClose();
+    },
+    onError: toast.error,
+  });
+  const valid =
+    form.name.trim() &&
+    /^https?:\/\//.test(form.base_url.trim()) &&
+    headersValid &&
+    (editing || /^[a-z0-9][a-z0-9-]{1,29}$/.test(form.code.trim()));
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={editing ? `Sửa ${provider.name}` : "Thêm nhà cung cấp"}
+      description="Sau khi lưu: thêm key ở tab Key nhà cung cấp, thêm model + giá ở tab Model & giá."
+      footer={
+        <>
+          <Button onClick={onClose}>Huỷ</Button>
+          <Button variant="primary" loading={save.isPending} disabled={!valid} onClick={() => save.mutate()}>
+            Lưu
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        {!editing && (
+          <Field label="Điền nhanh từ mẫu" className="sm:col-span-2" hint="Base URL theo tài liệu của hãng; bấm ⚡ ở key để kiểm tra">
+            {(id) => (
+              <Select id={id} value="" onChange={(e) => applyPreset(e.target.value)}>
+                <option value="">Chọn mẫu…</option>
+                {PRESETS.map((x) => (
+                  <option key={x.code} value={x.code}>
+                    {x.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )}
+        <Field label="Mã" required hint="Chữ thường, số, gạch ngang; dùng trong đường dẫn /llm/<mã>/v1">
+          {(id) => (
+            <Input id={id} className="font-mono" value={form.code} disabled={editing} placeholder="grok" onChange={(e) => set("code", e.target.value.toLowerCase())} />
+          )}
+        </Field>
+        <Field label="Tên" required>
+          {(id) => <Input id={id} value={form.name} placeholder="xAI Grok" onChange={(e) => set("name", e.target.value)} />}
+        </Field>
+        <Field label="Định dạng API" required hint="Hầu hết nhà cung cấp tương thích OpenAI">
+          {(id) => (
+            <Select id={id} value={form.api_format} disabled={provider?.is_builtin} onChange={(e) => set("api_format", e.target.value as ApiFormat)}>
+              <option value="openai">OpenAI (Bearer, /chat/completions)</option>
+              <option value="anthropic">Anthropic (x-api-key, /messages)</option>
+            </Select>
+          )}
+        </Field>
+        <Field label="Base URL" required hint="Gồm phần phiên bản, vd https://api.x.ai/v1">
+          {(id) => <Input id={id} className="font-mono" value={form.base_url} placeholder="https://…/v1" onChange={(e) => set("base_url", e.target.value)} />}
+        </Field>
+        <Field label="Header bổ sung" className="sm:col-span-2" hint="Mỗi dòng một header dạng Tên: giá trị. Không đặt key bí mật ở đây.">
+          {(id) => (
+            <textarea
+              id={id}
+              rows={2}
+              value={form.extra_headers}
+              placeholder="HTTP-Referer: https://dev.mcv.network"
+              onChange={(e) => set("extra_headers", e.target.value)}
+              className={cn(
+                "w-full rounded-lg border bg-surface px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-brand/20 focus:outline-none",
+                headersValid ? "border-line-strong focus:border-brand" : "border-red-400",
+              )}
+            />
+          )}
+        </Field>
+        {form.api_format === "openai" && (
+          <Checkbox
+            className="sm:col-span-2"
+            label="Tự bật stream_options.include_usage khi stream (để tính chi phí) — tắt nếu nhà cung cấp báo lỗi tham số này"
+            checked={form.stream_usage}
+            onChange={(e) => set("stream_usage", e.target.checked)}
+          />
+        )}
+        <Checkbox className="sm:col-span-2" label="Bật" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} />
+      </div>
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------- Key nhà cung cấp
 
 function ProviderKeysTab() {
+  const { label: providerLabel } = useProviders();
   const qc = useQueryClient();
   const toast = useToast();
   const [editing, setEditing] = useState<LlmProviderKey | "new" | null>(null);
@@ -624,7 +887,7 @@ function ProviderKeysTab() {
       {keys.isPending ? (
         <Spinner />
       ) : !keys.data?.length ? (
-        <Empty title="Chưa có key nhà cung cấp" description="Thêm key Anthropic / OpenAI để gateway gọi được." />
+        <Empty title="Chưa có key nhà cung cấp" description="Thêm key của Anthropic, OpenAI hoặc nhà cung cấp khác để gateway gọi được." />
       ) : (
         <Table>
           <thead>
@@ -689,8 +952,9 @@ function ProviderKeyModal({ providerKey, onClose }: { providerKey?: LlmProviderK
   const qc = useQueryClient();
   const toast = useToast();
   const editing = !!providerKey;
+  const { providers } = useProviders();
   const [form, setForm] = useState({
-    provider: (providerKey?.provider ?? "anthropic") as Provider,
+    provider: providerKey?.provider ?? "anthropic",
     name: providerKey?.name ?? "",
     api_key: "",
     base_url: providerKey?.base_url ?? "",
@@ -740,10 +1004,10 @@ function ProviderKeyModal({ providerKey, onClose }: { providerKey?: LlmProviderK
       <div className="grid gap-4">
         <Field label="Nhà cung cấp" required>
           {(id) => (
-            <Select id={id} value={form.provider} disabled={editing} onChange={(e) => set("provider", e.target.value as Provider)}>
-              {Object.entries(PROVIDERS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
+            <Select id={id} value={form.provider} disabled={editing} onChange={(e) => set("provider", e.target.value)}>
+              {providers.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
                 </option>
               ))}
             </Select>
@@ -761,7 +1025,7 @@ function ProviderKeyModal({ providerKey, onClose }: { providerKey?: LlmProviderK
             <Input id={id} type="password" autoComplete="off" className="font-mono" value={form.api_key} onChange={(e) => set("api_key", e.target.value)} />
           )}
         </Field>
-        <Field label="Base URL" hint="Bỏ trống = endpoint chính thức của nhà cung cấp">
+        <Field label="Base URL riêng cho key này" hint="Bỏ trống = base URL của nhà cung cấp (gồm /v1)">
           {(id) => <Input id={id} value={form.base_url} placeholder="https://…" onChange={(e) => set("base_url", e.target.value)} />}
         </Field>
         <Field label="Độ ưu tiên (0–100)" hint="Cao hơn được dùng trước">
@@ -785,6 +1049,7 @@ function ProviderKeyModal({ providerKey, onClose }: { providerKey?: LlmProviderK
 // ---------------------------------------------------------------- Model & giá
 
 function ModelsTab({ manage }: { manage: boolean }) {
+  const { label: providerLabel } = useProviders();
   const qc = useQueryClient();
   const toast = useToast();
   const [editing, setEditing] = useState<LlmModel | "new" | null>(null);
@@ -862,8 +1127,9 @@ function ModelModal({ model, onClose }: { model?: LlmModel; onClose: () => void 
   const qc = useQueryClient();
   const toast = useToast();
   const editing = !!model;
+  const { providers } = useProviders();
   const [form, setForm] = useState({
-    provider: (model?.provider ?? "anthropic") as Provider,
+    provider: model?.provider ?? "anthropic",
     model: model?.model ?? "",
     input_price: String(model?.input_price ?? ""),
     output_price: String(model?.output_price ?? ""),
@@ -921,10 +1187,10 @@ function ModelModal({ model, onClose }: { model?: LlmModel; onClose: () => void 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nhà cung cấp" required>
           {(id) => (
-            <Select id={id} value={form.provider} onChange={(e) => set("provider", e.target.value as Provider)}>
-              {Object.entries(PROVIDERS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
+            <Select id={id} value={form.provider} onChange={(e) => set("provider", e.target.value)}>
+              {providers.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
                 </option>
               ))}
             </Select>

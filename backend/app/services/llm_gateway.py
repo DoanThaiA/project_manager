@@ -1,7 +1,9 @@
 """AI Gateway tối giản (docs/LLM_GATEWAY.md): mã hoá key nhà cung cấp, key dự án, đọc usage, tính chi phí.
 
 Gateway chuyển tiếp NGUYÊN định dạng của từng nhà cung cấp (không chuyển đổi), nên Anthropic SDK / OpenAI SDK dùng
-được trực tiếp, chỉ đổi base_url + api_key. Usage đọc từ phản hồi (JSON hoặc SSE) để tính chi phí.
+được trực tiếp, chỉ đổi base_url + api_key. Nhà cung cấp cấu hình động (bảng llm_providers); cách gửi key + đường dẫn
+được phép đi theo định dạng API: 'anthropic' hoặc 'openai' (Grok, DeepSeek, OpenRouter, Ollama... đều tương thích
+OpenAI). Usage đọc từ phản hồi (JSON hoặc SSE) để tính chi phí.
 """
 
 import json
@@ -20,15 +22,18 @@ from app.core.security import hash_api_token
 
 CLIENT_KEY_PREFIX = "pm_llm_"
 
-# Đường dẫn (sau /v1/) được phép chuyển tiếp; True = request tính tiền (cần model + ghi usage)
-PROVIDER_PATHS: dict[str, dict[str, bool]] = {
+API_FORMATS = ("openai", "anthropic")
+
+# Đường dẫn (sau /v1/) được phép chuyển tiếp theo định dạng API; True = request tính tiền (cần model + ghi usage)
+FORMAT_PATHS: dict[str, dict[str, bool]] = {
     "anthropic": {"messages": True, "messages/count_tokens": False},
     "openai": {"chat/completions": True, "responses": True, "embeddings": True, "completions": True},
 }
 
 
-def provider_base_url(provider: str) -> str:
-    return {"anthropic": settings.llm_anthropic_base_url, "openai": settings.llm_openai_base_url}[provider]
+def upstream_url(base_url: str, path: str) -> str:
+    """base_url gồm phần phiên bản (vd https://api.x.ai/v1) + đường dẫn (chat/completions)."""
+    return f"{base_url.rstrip('/')}/{path}"
 
 
 # ---------------------------------------------------------------- Mã hoá key nhà cung cấp
@@ -59,10 +64,10 @@ def key_hint(raw: str) -> str:
     return "••••" + raw[-4:]
 
 
-def upstream_auth_headers(provider: str, raw_key: str) -> dict[str, str]:
-    if provider == "anthropic":
-        return {"x-api-key": raw_key}
-    return {"authorization": f"Bearer {raw_key}"}
+def upstream_headers(api_format: str, raw_key: str, extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Header xác thực theo định dạng API + header bổ sung của nhà cung cấp (không ghi đè được header xác thực)."""
+    auth = {"x-api-key": raw_key} if api_format == "anthropic" else {"authorization": f"Bearer {raw_key}"}
+    return {**{k.lower(): str(v) for k, v in (extra or {}).items()}, **auth}
 
 
 # ---------------------------------------------------------------- Key dự án

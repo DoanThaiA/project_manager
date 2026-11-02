@@ -1,12 +1,13 @@
-# AI Gateway: dự án gọi Anthropic / OpenAI qua key riêng, có hạn mức
+# AI Gateway: dự án gọi Anthropic / OpenAI / Grok… qua key riêng, có hạn mức
 
-Các dự án **không cầm key thật** của Anthropic / OpenAI. Mỗi dự án được cấp một key gateway (`pm_llm_…`) có
+Các dự án **không cầm key thật** của nhà cung cấp AI (Anthropic, OpenAI, Grok, DeepSeek…). Mỗi dự án được cấp một key gateway (`pm_llm_…`) có
 hạn mức USD theo tháng; gateway thay key thật, chuyển tiếp request và ghi lại token + chi phí.
 
 ```
 Dự án A ─┐  Authorization: Bearer pm_llm_…      ┌─► api.anthropic.com  (key thật, mã hoá trong DB)
 Dự án B ─┼─► https://<domain>/llm/anthropic/... ┤
-Dự án C ─┘   https://<domain>/llm/openai/v1/... └─► api.openai.com
+Dự án C ─┘   https://<domain>/llm/openai/v1/... ├─► api.openai.com
+             https://<domain>/llm/grok/v1/...   └─► api.x.ai  (nhà cung cấp thêm trên giao diện)
              kiểm tra key, model, hạn mức → chọn key nhà cung cấp → chuyển tiếp (kể cả stream) → ghi usage
 ```
 
@@ -55,6 +56,7 @@ Dự án C ─┘   https://<domain>/llm/openai/v1/... └─► api.openai.com
 
 Quyền `llm.manage` (mặc định: admin) để cấu hình; `llm.view` (admin, Quản lý dự án, Ban lãnh đạo) để xem chi phí.
 
+0. **Nhà cung cấp** (chỉ khi cần thêm hãng ngoài Anthropic / OpenAI có sẵn) › *Thêm nhà cung cấp*, xem mục 2a.
 1. **Key nhà cung cấp** › *Thêm key*: chọn Anthropic / OpenAI, dán key. Bấm ⚡ *Kiểm tra key* (gọi thử danh sách
    model). Key chỉ lưu dạng mã hoá, sau đó chỉ thấy `••••a1b2`.
    - Thêm nhiều key cho một nhà cung cấp: ưu tiên cao được dùng trước. Key gặp 429 / 5xx **tạm nghỉ 1 phút**,
@@ -66,6 +68,30 @@ Quyền `llm.manage` (mặc định: admin) để cấu hình; `llm.view` (admin
    request / phút, ngày hết hạn. Key đầy đủ **chỉ hiện một lần** kèm đoạn code mẫu — copy gửi cho dự án.
    Lộ key thì *Thu hồi* (chặn ngay) rồi cấp key mới.
 4. **Sử dụng & chi phí**: chi phí / token theo key dự án (kèm % hạn mức), theo model, theo ngày; danh sách lỗi.
+
+## 2a. Thêm nhà cung cấp khác (Grok, DeepSeek, OpenRouter, Ollama…)
+
+Nhà cung cấp cấu hình động trong bảng `llm_providers` (migration `0016`), không phải sửa code. Gateway chỉ cần:
+
+| Trường | Ví dụ (xAI Grok) | Ý nghĩa |
+|---|---|---|
+| Mã | `grok` | Đoạn đường dẫn: dự án gọi `/llm/grok/v1/...`. Không đổi được sau khi tạo |
+| Định dạng API | `openai` | `openai`: key gửi bằng `Authorization: Bearer`, đường dẫn `chat/completions`, `responses`, `embeddings`, `completions`. `anthropic`: key gửi bằng `x-api-key`, đường dẫn `messages` |
+| Base URL | `https://api.x.ai/v1` | **Gồm phần phiên bản**; gateway nối thêm đường dẫn: `{base_url}/chat/completions` |
+| Header bổ sung | `HTTP-Referer: …` | Gửi kèm mọi request (vd OpenRouter). Không đặt key bí mật ở đây |
+| Tự bật `include_usage` | bật | Định dạng openai: thêm `stream_options.include_usage` khi stream để đọc số token. Tắt nếu nhà cung cấp báo lỗi tham số này (khi đó request stream không tính được chi phí) |
+
+Form *Thêm nhà cung cấp* có mẫu điền sẵn: xAI Grok, DeepSeek, Mistral, Groq, OpenRouter, Google Gemini (lớp tương
+thích OpenAI), Ollama. Base URL trong mẫu theo tài liệu của hãng lúc viết — bấm ⚡ *Kiểm tra key* sau khi thêm key
+để chắc chắn (gateway gọi `{base_url}/models`).
+
+Thêm Grok: *Nhà cung cấp* › mẫu **xAI Grok** › Lưu → *Key nhà cung cấp* › chọn Grok, dán key xAI, ⚡ → *Model & giá*
+› chọn Grok, tên model + giá theo bảng giá xAI → cho key dự án được dùng model đó.
+
+- Anthropic, OpenAI có sẵn: không xoá, không đổi định dạng (sửa được base URL, tắt được).
+- Xoá nhà cung cấp phải xoá hết key + model của nó trước. Tắt nhà cung cấp thì gateway trả 404 cho đường dẫn của nó.
+- Chỉ hỗ trợ nhà cung cấp dùng định dạng OpenAI hoặc Anthropic. API riêng hoàn toàn (vd API gốc của Gemini, không qua
+  lớp tương thích OpenAI) cần viết thêm code.
 
 ## 3. Dự án dùng thế nào
 
@@ -87,13 +113,21 @@ client = OpenAI(base_url="https://<domain>/llm/openai/v1", api_key="pm_llm_...")
 resp = client.chat.completions.create(model="<model OpenAI đã bật>", messages=[{"role": "user", "content": "Xin chào"}])
 ```
 
-TypeScript / các ngôn ngữ khác tương tự: chỉ đổi `baseURL` + `apiKey`.
+**Nhà cung cấp thêm động** (định dạng openai, vd Grok) dùng OpenAI SDK với `base_url=…/llm/<mã>/v1`:
+
+```python
+client = OpenAI(base_url="https://<domain>/llm/grok/v1", api_key="pm_llm_...")
+client.chat.completions.create(model="<model Grok đã bật>", messages=[{"role": "user", "content": "Xin chào"}])
+```
+
+TypeScript / các ngôn ngữ khác tương tự: chỉ đổi `baseURL` + `apiKey`. Khi cấp key, hộp thoại hiện sẵn đoạn code
+cho từng nhà cung cấp đang bật.
 
 | Endpoint gateway | Chuyển tới |
 |---|---|
-| `POST /llm/anthropic/v1/messages`, `…/messages/count_tokens` | `api.anthropic.com/v1/...` |
-| `POST /llm/openai/v1/chat/completions`, `/responses`, `/embeddings`, `/completions` | `api.openai.com/v1/...` |
-| `GET /llm/{anthropic\|openai}/v1/models` | Danh sách model key này được dùng |
+| `POST /llm/<mã>/v1/messages`, `…/messages/count_tokens` (định dạng anthropic) | `{base_url}/messages…` |
+| `POST /llm/<mã>/v1/chat/completions`, `/responses`, `/embeddings`, `/completions` (định dạng openai) | `{base_url}/chat/completions…` |
+| `GET /llm/<mã>/v1/models` | Danh sách model key này được dùng |
 
 Lỗi của gateway trả theo **định dạng của nhà cung cấp** để SDK hiển thị đúng:
 
@@ -132,4 +166,6 @@ Lỗi của gateway trả theo **định dạng của nhà cung cấp** để SD
 | Stream trả về một lần ở cuối thay vì từng chữ | nginx thiếu `proxy_buffering off` |
 | Mọi request 503 "chưa có key … sẵn sàng" | Chưa thêm key, key đang tắt, hoặc mọi key đang tạm nghỉ (xem cột *Lỗi gần nhất*, bấm ⚡ để kiểm tra) |
 | "Không giải mã được key: LLM_ENCRYPTION_KEY đã bị đổi?" | Khoá mã hoá khác lúc lưu key: khôi phục khoá cũ, hoặc nhập lại key nhà cung cấp |
-| Chi phí hiện 0 | Model chưa nhập giá |
+| Chi phí hiện 0 | Model chưa nhập giá; hoặc request stream của nhà cung cấp đã tắt *include_usage* |
+| 404 "Gateway không có nhà cung cấp" | Sai mã trong đường dẫn, hoặc nhà cung cấp đang tắt |
+| ⚡ báo 404 với nhà cung cấp mới | Base URL thiếu / thừa phần phiên bản (`/v1`) |

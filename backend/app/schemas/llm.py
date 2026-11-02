@@ -5,18 +5,50 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from app.schemas.common import ORMModel
 
-Provider = Literal["anthropic", "openai"]
+# Mã nhà cung cấp (bảng llm_providers), vd anthropic, openai, grok
+ProviderCode = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{1,29}$")]
+ApiFormat = Literal["openai", "anthropic"]
 Price = Annotated[float, Field(ge=0, le=100000, description="USD / 1 triệu token")]
+
+
+# ---------------------------------------------------------------- Nhà cung cấp
+
+
+class ProviderIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    api_format: ApiFormat = Field(description="openai: Bearer + /chat/completions...; anthropic: x-api-key + /messages")
+    base_url: HttpUrl = Field(description="Gồm phần phiên bản, vd https://api.x.ai/v1")
+    extra_headers: dict[str, str] = Field(default_factory=dict, description="Header gửi kèm mọi request")
+    stream_usage: bool = Field(default=True, description="Định dạng openai: tự bật include_usage khi stream")
+    is_active: bool = True
+
+
+class ProviderCreate(ProviderIn):
+    code: ProviderCode = Field(description="Đoạn đường dẫn /llm/{code}/v1/..., không đổi được sau khi tạo")
+
+
+class ProviderOut(ORMModel):
+    id: int
+    code: str
+    name: str
+    api_format: str
+    base_url: str
+    extra_headers: dict[str, str]
+    stream_usage: bool
+    is_active: bool
+    is_builtin: bool
+    key_count: int = 0
+    model_count: int = 0
 
 
 # ---------------------------------------------------------------- Key nhà cung cấp
 
 
 class ProviderKeyCreate(BaseModel):
-    provider: Provider
+    provider: ProviderCode
     name: str = Field(min_length=1, max_length=100)
     api_key: str = Field(min_length=10, max_length=500, description="Key thật; chỉ gửi lên, không bao giờ trả lại")
-    base_url: HttpUrl | None = Field(default=None, description="Bỏ trống = endpoint chính thức")
+    base_url: HttpUrl | None = Field(default=None, description="Bỏ trống = base URL của nhà cung cấp (gồm /v1)")
     priority: int = Field(default=0, ge=0, le=100, description="Cao hơn được dùng trước")
     is_active: bool = True
 
@@ -55,7 +87,7 @@ class ProviderKeyTestOut(BaseModel):
 
 
 class ModelIn(BaseModel):
-    provider: Provider
+    provider: ProviderCode
     model: str = Field(min_length=1, max_length=100, description="Đúng tên model của nhà cung cấp")
     input_price: Price = 0
     output_price: Price = 0

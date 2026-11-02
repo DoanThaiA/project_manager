@@ -2,10 +2,26 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
+
+
+class LlmProvider(TimestampMixin, Base):
+    """Nhà cung cấp AI: code là đoạn đường dẫn /llm/{code}/v1/..., api_format quyết định cách gửi key + đường dẫn."""
+
+    __tablename__ = "llm_providers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
+    api_format: Mapped[str] = mapped_column(String(20))  # openai | anthropic
+    base_url: Mapped[str] = mapped_column(String(255))  # gồm phần phiên bản, vd https://api.x.ai/v1
+    extra_headers: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+    stream_usage: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class LlmProviderKey(TimestampMixin, Base):
@@ -14,7 +30,7 @@ class LlmProviderKey(TimestampMixin, Base):
     __tablename__ = "llm_provider_keys"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    provider: Mapped[str] = mapped_column(String(20))  # anthropic | openai
+    provider: Mapped[str] = mapped_column(String(30), ForeignKey("llm_providers.code"))
     name: Mapped[str] = mapped_column(String(100))
     encrypted_key: Mapped[str] = mapped_column(Text)
     key_hint: Mapped[str] = mapped_column(String(12))
@@ -34,7 +50,7 @@ class LlmModel(TimestampMixin, Base):
     __tablename__ = "llm_models"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    provider: Mapped[str] = mapped_column(String(20))
+    provider: Mapped[str] = mapped_column(String(30), ForeignKey("llm_providers.code"))
     model: Mapped[str] = mapped_column(String(100))
     input_price: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal(0))
     output_price: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal(0))
@@ -70,7 +86,7 @@ class LlmUsageLog(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     client_key_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("llm_client_keys.id", ondelete="SET NULL"))
     project_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="SET NULL"))
-    provider: Mapped[str] = mapped_column(String(20))
+    provider: Mapped[str] = mapped_column(String(30))
     model: Mapped[str | None] = mapped_column(String(100))
     endpoint: Mapped[str] = mapped_column(String(50))
     provider_key_id: Mapped[int | None] = mapped_column(

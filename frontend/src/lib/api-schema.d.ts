@@ -679,6 +679,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/llm/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhà cung cấp AI của gateway */
+        get: operations["list_providers_api_v1_llm_providers_get"];
+        put?: never;
+        /** Create Provider */
+        post: operations["create_provider_api_v1_llm_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm/providers/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sửa nhà cung cấp (gửi đủ trường; không đổi được mã) */
+        put: operations["update_provider_api_v1_llm_providers__code__put"];
+        post?: never;
+        /** Delete Provider */
+        delete: operations["delete_provider_api_v1_llm_providers__code__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/llm/provider-keys": {
         parameters: {
             query?: never;
@@ -2669,11 +2705,8 @@ export interface components {
         };
         /** ModelIn */
         ModelIn: {
-            /**
-             * Provider
-             * @enum {string}
-             */
-            provider: "anthropic" | "openai";
+            /** Provider */
+            provider: string;
             /**
              * Model
              * @description Đúng tên model của nhà cung cấp
@@ -3152,13 +3185,85 @@ export interface components {
             /** Budget Hours */
             budget_hours?: number | string | null;
         };
-        /** ProviderKeyCreate */
-        ProviderKeyCreate: {
+        /** ProviderCreate */
+        ProviderCreate: {
+            /** Name */
+            name: string;
             /**
-             * Provider
+             * Api Format
+             * @description openai: Bearer + /chat/completions...; anthropic: x-api-key + /messages
              * @enum {string}
              */
-            provider: "anthropic" | "openai";
+            api_format: "openai" | "anthropic";
+            /**
+             * Base Url
+             * Format: uri
+             * @description Gồm phần phiên bản, vd https://api.x.ai/v1
+             */
+            base_url: string;
+            /**
+             * Extra Headers
+             * @description Header gửi kèm mọi request
+             */
+            extra_headers?: {
+                [key: string]: string;
+            };
+            /**
+             * Stream Usage
+             * @description Định dạng openai: tự bật include_usage khi stream
+             * @default true
+             */
+            stream_usage: boolean;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Code
+             * @description Đoạn đường dẫn /llm/{code}/v1/..., không đổi được sau khi tạo
+             */
+            code: string;
+        };
+        /** ProviderIn */
+        ProviderIn: {
+            /** Name */
+            name: string;
+            /**
+             * Api Format
+             * @description openai: Bearer + /chat/completions...; anthropic: x-api-key + /messages
+             * @enum {string}
+             */
+            api_format: "openai" | "anthropic";
+            /**
+             * Base Url
+             * Format: uri
+             * @description Gồm phần phiên bản, vd https://api.x.ai/v1
+             */
+            base_url: string;
+            /**
+             * Extra Headers
+             * @description Header gửi kèm mọi request
+             */
+            extra_headers?: {
+                [key: string]: string;
+            };
+            /**
+             * Stream Usage
+             * @description Định dạng openai: tự bật include_usage khi stream
+             * @default true
+             */
+            stream_usage: boolean;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ProviderKeyCreate */
+        ProviderKeyCreate: {
+            /** Provider */
+            provider: string;
             /** Name */
             name: string;
             /**
@@ -3168,7 +3273,7 @@ export interface components {
             api_key: string;
             /**
              * Base Url
-             * @description Bỏ trống = endpoint chính thức
+             * @description Bỏ trống = base URL của nhà cung cấp (gồm /v1)
              */
             base_url?: string | null;
             /**
@@ -3243,6 +3348,39 @@ export interface components {
              * @default false
              */
             reset_cooldown: boolean;
+        };
+        /** ProviderOut */
+        ProviderOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Api Format */
+            api_format: string;
+            /** Base Url */
+            base_url: string;
+            /** Extra Headers */
+            extra_headers: {
+                [key: string]: string;
+            };
+            /** Stream Usage */
+            stream_usage: boolean;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Builtin */
+            is_builtin: boolean;
+            /**
+             * Key Count
+             * @default 0
+             */
+            key_count: number;
+            /**
+             * Model Count
+             * @default 0
+             */
+            model_count: number;
         };
         /** RecordCreate */
         RecordCreate: {
@@ -6202,6 +6340,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GatewayStatus"];
+                };
+            };
+        };
+    };
+    list_providers_api_v1_llm_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"][];
+                };
+            };
+        };
+    };
+    create_provider_api_v1_llm_providers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_provider_api_v1_llm_providers__code__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_api_v1_llm_providers__code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

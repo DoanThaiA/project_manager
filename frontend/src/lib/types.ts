@@ -76,6 +76,7 @@ export type AttendanceShift = S["ShiftOut"];
 export type AttendanceShiftDay = S["ShiftDay"];
 
 export type LlmProviderKey = S["ProviderKeyOut"];
+export type LlmProvider = S["ProviderOut"];
 export type LlmModel = S["ModelOut"];
 export type LlmClientKey = S["ClientKeyOut"];
 export type LlmClientKeyCreated = S["ClientKeyCreated"];

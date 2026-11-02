@@ -1,8 +1,9 @@
-"""AI Gateway: chuyển tiếp /llm/{anthropic|openai}/v1/... tới nhà cung cấp (docs/LLM_GATEWAY.md).
+"""AI Gateway: chuyển tiếp /llm/{code}/v1/... tới nhà cung cấp cấu hình trong llm_providers (docs/LLM_GATEWAY.md).
 
 Dự án dùng SDK chính chủ, chỉ đổi base_url + api_key:
     Anthropic(base_url="https://<domain>/llm/anthropic", api_key="pm_llm_...")
     OpenAI(base_url="https://<domain>/llm/openai/v1", api_key="pm_llm_...")
+    OpenAI(base_url="https://<domain>/llm/grok/v1", api_key="pm_llm_...")   # nhà cung cấp định dạng openai
 Mount ngoài /api/v1 (main.py); nginx chuyển /llm/ thẳng tới API, tắt buffering để stream.
 """
 
@@ -21,7 +22,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal, get_db
-from app.models import LlmClientKey, LlmModel, LlmProviderKey, LlmUsageLog
+from app.models import LlmClientKey, LlmModel, LlmProvider, LlmProviderKey, LlmUsageLog
 from app.services import llm_gateway as gw
 
 logger = logging.getLogger("app.llm_gateway")
@@ -35,9 +36,9 @@ FORWARD_HEADERS = ("content-type", "accept", "anthropic-version", "anthropic-bet
 RESPONSE_HEADERS = ("request-id", "x-request-id", "openai-processing-ms", "retry-after")
 
 
-def _error(provider: str, status: int, message: str, kind: str) -> JSONResponse:
-    """Lỗi theo định dạng của nhà cung cấp để SDK hiển thị đúng."""
-    if provider == "anthropic":
+def _error(api_format: str, status: int, message: str, kind: str) -> JSONResponse:
+    """Lỗi theo định dạng API của nhà cung cấp để SDK hiển thị đúng."""
+    if api_format == "anthropic":
         body = {"type": "error", "error": {"type": kind, "message": message}}
     else:
         body = {"error": {"message": message, "type": kind, "code": kind}}
@@ -76,6 +77,10 @@ async def _authenticate(db: AsyncSession, request: Request) -> LlmClientKey | No
         .values(last_used_at=func.now())
     )
     return key
+
+
+async def _provider(db: AsyncSession, code: str) -> LlmProvider | None:
+    return await db.scalar(select(LlmProvider).where(LlmProvider.code == code, LlmProvider.is_active))
 
 
 async def _allowed_models(db: AsyncSession, provider: str, key: LlmClientKey) -> list[str]:
@@ -153,14 +158,15 @@ def _cooldown(pk: LlmProviderKey, status: int | None, message: str) -> None:
 
 @router.get("/{provider}/v1/models", summary="Model key này được dùng (định dạng của nhà cung cấp)")
 async def list_models(provider: str, request: Request, db: AsyncSession = Depends(get_db)):
-    if provider not in gw.PROVIDER_PATHS:
-        return _error("openai", 404, f"Không hỗ trợ nhà cung cấp '{provider}'", "not_found_error")
+    prov = await _provider(db, provider)
+    if prov is None:
+        return _error("openai", 404, f"Gateway không có nhà cung cấp '{provider}'", "not_found_error")
     key = await _authenticate(db, request)
     if key is None:
-        return _error(provider, 401, "Key gateway không hợp lệ, đã thu hồi hoặc hết hạn", "authentication_error")
+        return _error(prov.api_format, 401, "Key gateway không hợp lệ, đã thu hồi hoặc hết hạn", "authentication_error")
     await db.commit()
     models = await _allowed_models(db, provider, key)
-    if provider == "anthropic":
+    if prov.api_format == "anthropic":
         data = [{"type": "model", "id": m, "display_name": m, "created_at": "1970-01-01T00:00:00Z"} for m in models]
         first, last = (models[0], models[-1]) if models else (None, None)
         return {"data": data, "has_more": False, "first_id": first, "last_id": last}
@@ -173,24 +179,26 @@ async def list_models(provider: str, request: Request, db: AsyncSession = Depend
 @router.post("/{provider}/v1/{path:path}", summary="Chuyển tiếp request tới nhà cung cấp")
 async def proxy(provider: str, path: str, request: Request, db: AsyncSession = Depends(get_db)):
     started = time.monotonic()
-    paths = gw.PROVIDER_PATHS.get(provider)
-    if paths is None or path not in paths:
-        return _error(
-            provider if paths else "openai", 404, f"Gateway không hỗ trợ /{provider}/v1/{path}", "not_found_error"
-        )
+    prov = await _provider(db, provider)
+    if prov is None:
+        return _error("openai", 404, f"Gateway không có nhà cung cấp '{provider}'", "not_found_error")
+    fmt = prov.api_format
+    paths = gw.FORMAT_PATHS[fmt]
+    if path not in paths:
+        return _error(fmt, 404, f"Gateway không hỗ trợ /{provider}/v1/{path}", "not_found_error")
     billable = paths[path]
 
     key = await _authenticate(db, request)
     if key is None:
-        return _error(provider, 401, "Key gateway không hợp lệ, đã thu hồi hoặc hết hạn", "authentication_error")
+        return _error(fmt, 401, "Key gateway không hợp lệ, đã thu hồi hoặc hết hạn", "authentication_error")
 
     raw_body = await request.body()
     try:
         body = json.loads(raw_body) if raw_body else {}
     except ValueError:
-        return _error(provider, 400, "Body phải là JSON", "invalid_request_error")
+        return _error(fmt, 400, "Body phải là JSON", "invalid_request_error")
     if not isinstance(body, dict):
-        return _error(provider, 400, "Body phải là JSON object", "invalid_request_error")
+        return _error(fmt, 400, "Body phải là JSON object", "invalid_request_error")
     model = body.get("model") if isinstance(body.get("model"), str) else None
     stream = body.get("stream") is True
 
@@ -200,24 +208,24 @@ async def proxy(provider: str, path: str, request: Request, db: AsyncSession = D
             select(LlmModel).where(LlmModel.provider == provider, LlmModel.model == model, LlmModel.is_active)
         )
         if price is None:
-            return _error(provider, 400, f"Model '{model}' chưa được bật trên gateway", "invalid_request_error")
+            return _error(fmt, 400, f"Model '{model}' chưa được bật trên gateway", "invalid_request_error")
         if key.allowed_models and model not in key.allowed_models:
-            return _error(provider, 403, f"Key này không được dùng model '{model}'", "permission_error")
+            return _error(fmt, 403, f"Key này không được dùng model '{model}'", "permission_error")
         if key.rpm_limit and not gw.rate_limiter.allow(key.id, key.rpm_limit):
-            return _error(provider, 429, f"Vượt giới hạn {key.rpm_limit} request / phút", "rate_limit_error")
+            return _error(fmt, 429, f"Vượt giới hạn {key.rpm_limit} request / phút", "rate_limit_error")
         if key.monthly_budget_usd is not None:
             spent = await spent_this_month(db, key.id)
             if spent >= key.monthly_budget_usd:
                 message = f"Đã dùng hết hạn mức tháng ({spent:.2f}/{key.monthly_budget_usd} USD)"
-                return _error(provider, 429, message, "rate_limit_error")
-        # OpenAI chỉ trả usage trong stream khi được yêu cầu
-        if provider == "openai" and path in ("chat/completions", "completions") and stream:
+                return _error(fmt, 429, message, "rate_limit_error")
+        # Định dạng OpenAI chỉ trả usage trong stream khi được yêu cầu (tắt được nếu nhà cung cấp không nhận tham số)
+        if fmt == "openai" and prov.stream_usage and path in ("chat/completions", "completions") and stream:
             options = body.get("stream_options") if isinstance(body.get("stream_options"), dict) else {}
             body["stream_options"] = {**options, "include_usage": True}
             raw_body = json.dumps(body).encode()
 
     headers = {h: request.headers[h] for h in FORWARD_HEADERS if h in request.headers}
-    if provider == "anthropic":
+    if fmt == "anthropic":
         headers.setdefault("anthropic-version", "2023-06-01")
     headers.setdefault("content-type", "application/json")
     headers["accept-encoding"] = "identity"  # chuyển tiếp nguyên byte, không phải giải nén / nén lại
@@ -225,7 +233,7 @@ async def proxy(provider: str, path: str, request: Request, db: AsyncSession = D
     candidates = await _provider_keys(db, provider)
     if not candidates:
         await db.commit()
-        return _error(provider, 503, f"Chưa có key {provider} nào sẵn sàng trên gateway", "overloaded_error")
+        return _error(fmt, 503, f"Chưa có key {prov.name} nào sẵn sàng trên gateway", "overloaded_error")
 
     client = gw.upstream_client()
     upstream: httpx.Response | None = None
@@ -236,14 +244,13 @@ async def proxy(provider: str, path: str, request: Request, db: AsyncSession = D
             raw_key = gw.decrypt_key(pk.encrypted_key)
         except gw.GatewayDisabled as exc:
             await db.commit()
-            return _error(provider, 503, str(exc), "api_error")
-        url = f"{(pk.base_url or gw.provider_base_url(provider)).rstrip('/')}/v1/{path}"
+            return _error(fmt, 503, str(exc), "api_error")
         req = client.build_request(
             "POST",
-            url,
+            gw.upstream_url(pk.base_url or prov.base_url, path),
             params=request.query_params,
             content=raw_body,
-            headers={**headers, **gw.upstream_auth_headers(provider, raw_key)},
+            headers={**headers, **gw.upstream_headers(fmt, raw_key, prov.extra_headers)},
         )
         try:
             resp = await client.send(req, stream=True)
@@ -275,7 +282,7 @@ async def proxy(provider: str, path: str, request: Request, db: AsyncSession = D
             started=started,
             error=last_error,
         )
-        return _error(provider, 502, f"Không gọi được {provider}: {last_error}", "api_error")
+        return _error(fmt, 502, f"Không gọi được {prov.name}: {last_error}", "api_error")
 
     used.last_used_at = datetime.now(UTC)
     if upstream.status_code in RETRYABLE or upstream.status_code in KEY_REJECTED:

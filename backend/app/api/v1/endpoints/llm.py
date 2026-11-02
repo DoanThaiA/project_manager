@@ -14,7 +14,7 @@ from app.api.deps import client_ip, require_permission
 from app.api.llm_proxy import VN_TZ, month_start, spent_this_month
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import ActivityLog, LlmClientKey, LlmModel, LlmProviderKey, LlmUsageLog, Project, User
+from app.models import ActivityLog, LlmClientKey, LlmModel, LlmProvider, LlmProviderKey, LlmUsageLog, Project, User
 from app.schemas.common import Page
 from app.schemas.llm import (
     ClientKeyCreate,
@@ -25,10 +25,13 @@ from app.schemas.llm import (
     ModelIn,
     ModelOut,
     ProjectBrief,
+    ProviderCreate,
+    ProviderIn,
     ProviderKeyCreate,
     ProviderKeyOut,
     ProviderKeyTestOut,
     ProviderKeyUpdate,
+    ProviderOut,
     UsageByDay,
     UsageByKey,
     UsageByModel,
@@ -79,6 +82,87 @@ async def gateway_status(_: User = Depends(require_permission("llm.view"))):
     )
 
 
+# ---------------------------------------------------------------- Nhà cung cấp
+
+
+async def _require_provider(db: AsyncSession, code: str) -> LlmProvider:
+    prov = await db.scalar(select(LlmProvider).where(LlmProvider.code == code))
+    if prov is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Chưa có nhà cung cấp '{code}'")
+    return prov
+
+
+async def _provider_out(db: AsyncSession, prov: LlmProvider) -> ProviderOut:
+    keys = await db.scalar(select(func.count()).where(LlmProviderKey.provider == prov.code))
+    models = await db.scalar(select(func.count()).where(LlmModel.provider == prov.code))
+    return ProviderOut.model_validate(prov).model_copy(update={"key_count": keys or 0, "model_count": models or 0})
+
+
+def _provider_values(body: ProviderIn) -> dict:
+    return {**body.model_dump(), "base_url": str(body.base_url).rstrip("/")}
+
+
+@router.get("/providers", response_model=list[ProviderOut], summary="Nhà cung cấp AI của gateway")
+async def list_providers(
+    _: User = Depends(require_permission("llm.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    providers = list(await db.scalars(select(LlmProvider).order_by(LlmProvider.is_builtin.desc(), LlmProvider.name)))
+    return [await _provider_out(db, p) for p in providers]
+
+
+@router.post("/providers", response_model=ProviderOut, status_code=status.HTTP_201_CREATED)
+async def create_provider(
+    body: ProviderCreate,
+    _: User = Depends(require_permission("llm.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    if await db.scalar(select(exists().where(LlmProvider.code == body.code))):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Đã có nhà cung cấp mã '{body.code}'")
+    prov = LlmProvider(**_provider_values(body))
+    db.add(prov)
+    await db.commit()
+    await db.refresh(prov)
+    return await _provider_out(db, prov)
+
+
+@router.put(
+    "/providers/{code}",
+    response_model=ProviderOut,
+    summary="Sửa nhà cung cấp (gửi đủ trường; không đổi được mã)",
+)
+async def update_provider(
+    code: str,
+    body: ProviderIn,
+    _: User = Depends(require_permission("llm.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    prov = await _require_provider(db, code)
+    if prov.is_builtin and body.api_format != prov.api_format:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Không đổi định dạng API của {prov.name}")
+    for field, value in _provider_values(body).items():
+        setattr(prov, field, value)
+    await db.commit()
+    await db.refresh(prov)
+    return await _provider_out(db, prov)
+
+
+@router.delete("/providers/{code}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_provider(
+    code: str,
+    _: User = Depends(require_permission("llm.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    prov = await _require_provider(db, code)
+    if prov.is_builtin:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Không xoá được {prov.name} (có sẵn); có thể tắt")
+    out = await _provider_out(db, prov)
+    if out.key_count or out.model_count:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Xoá các key và model của nhà cung cấp này trước")
+    await db.delete(prov)
+    await db.commit()
+
+
 # ---------------------------------------------------------------- Key nhà cung cấp
 
 
@@ -98,6 +182,7 @@ async def create_provider_key(
     user: User = Depends(require_permission("llm.manage")),
     db: AsyncSession = Depends(get_db),
 ):
+    await _require_provider(db, body.provider)
     raw = body.api_key.strip()
     pk = LlmProviderKey(
         provider=body.provider,
@@ -175,10 +260,11 @@ async def test_provider_key(
         raw = gw.decrypt_key(pk.encrypted_key)
     except gw.GatewayDisabled as exc:
         return ProviderKeyTestOut(ok=False, status_code=None, message=str(exc))
-    headers = gw.upstream_auth_headers(pk.provider, raw)
-    if pk.provider == "anthropic":
+    prov = await db.scalar(select(LlmProvider).where(LlmProvider.code == pk.provider))
+    headers = gw.upstream_headers(prov.api_format, raw, prov.extra_headers)
+    if prov.api_format == "anthropic":
         headers["anthropic-version"] = "2023-06-01"
-    url = f"{(pk.base_url or gw.provider_base_url(pk.provider)).rstrip('/')}/v1/models"
+    url = gw.upstream_url(pk.base_url or prov.base_url, "models")
     try:
         resp = await gw.upstream_client().get(url, headers=headers, timeout=20)
     except httpx.HTTPError as exc:
@@ -215,6 +301,7 @@ async def create_model(
     _: User = Depends(require_permission("llm.manage")),
     db: AsyncSession = Depends(get_db),
 ):
+    await _require_provider(db, body.provider)
     await _ensure_model_free(db, body.provider, body.model.strip())
     m = LlmModel(**{**body.model_dump(), "model": body.model.strip()})
     db.add(m)
@@ -233,6 +320,7 @@ async def update_model(
     m = await db.get(LlmModel, model_id)
     if m is None:
         raise not_found("model")
+    await _require_provider(db, body.provider)
     await _ensure_model_free(db, body.provider, body.model.strip(), exclude_id=model_id)
     for field, value in {**body.model_dump(), "model": body.model.strip()}.items():
         setattr(m, field, value)

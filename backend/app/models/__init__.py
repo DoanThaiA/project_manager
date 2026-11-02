@@ -9,7 +9,7 @@ from app.models.attendance import (
 )
 from app.models.crm import CrmContact, CrmEmailLead
 from app.models.customer import Customer, CustomerContact
-from app.models.llm import LlmClientKey, LlmModel, LlmProviderKey, LlmUsageLog
+from app.models.llm import LlmClientKey, LlmModel, LlmProvider, LlmProviderKey, LlmUsageLog
 from app.models.notification import (
     NotificationDelivery,
     NotificationSubscription,
@@ -36,6 +36,7 @@ __all__ = [
     "CustomerContact",
     "LlmClientKey",
     "LlmModel",
+    "LlmProvider",
     "LlmProviderKey",
     "LlmUsageLog",
     "NotificationDelivery",

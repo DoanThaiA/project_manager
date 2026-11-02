@@ -42,7 +42,11 @@ def _upstream(request: httpx.Request) -> httpx.Response:
                  "cache_creation_input_tokens": 0}  # fmt: skip
         return httpx.Response(200, json={"id": "msg_1", "content": [{"type": "text", "text": "ok"}], "usage": usage})
     if request.url.path == "/v1/chat/completions":
-        assert body.get("stream_options", {}).get("include_usage") is True  # gateway tự bật để đọc usage
+        if request.url.host == "api.openai.com":
+            assert body.get("stream_options", {}).get("include_usage") is True  # gateway tự bật để đọc usage
+        if request.url.host == "api.x.ai":  # nhà cung cấp tắt stream_usage: không thêm tham số
+            assert "stream_options" not in body
+            assert request.headers["x-title"] == "Project Manager"  # header bổ sung của nhà cung cấp
         chunks = (
             b'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'
             b'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":10,'
@@ -255,3 +259,75 @@ def _this_month() -> str:
     from app.api.llm_proxy import month_start
 
     return month_start().strftime("%Y-%m")
+
+
+async def test_dynamic_provider_grok(client, login, setup, upstream_calls):
+    """Thêm nhà cung cấp tương thích OpenAI (xAI Grok) trên giao diện, không sửa code."""
+    admin = setup["admin"]
+    staff = await login("dev.cuong")
+    grok = {
+        "code": "grok",
+        "name": "xAI Grok",
+        "api_format": "openai",
+        "base_url": "https://api.x.ai/v1",
+        "extra_headers": {"X-Title": "Project Manager"},
+        "stream_usage": False,
+    }
+    assert (await client.post("/llm/providers", json=grok, headers=staff)).status_code == 403
+    created = await client.post("/llm/providers", json=grok, headers=admin)
+    assert created.status_code == 201, created.text
+    assert (await client.post("/llm/providers", json=grok, headers=admin)).status_code == 409
+    bad = {**grok, "code": "Grok AI"}
+    assert (await client.post("/llm/providers", json=bad, headers=admin)).status_code == 422
+
+    # Chưa có nhà cung cấp thì không thêm key / model được
+    no_prov = {"provider": "khong-co", "name": "x", "api_key": "sk-1234567890"}
+    assert (await client.post("/llm/provider-keys", json=no_prov, headers=admin)).status_code == 422
+
+    key = await client.post(
+        "/llm/provider-keys", json={"provider": "grok", "name": "xAI", "api_key": "xai-real-key-0003"}, headers=admin
+    )
+    assert key.status_code == 201, key.text
+    model = {"provider": "grok", "model": "grok-test", "input_price": 2, "output_price": 10}
+    assert (await client.post("/llm/models", json=model, headers=admin)).status_code == 201
+    await client.patch(
+        f"/llm/client-keys/{setup['id']}",
+        json={"allowed_models": ["claude-sonnet-5-5", "gpt-test", "grok-test"]},
+        headers=admin,
+    )
+
+    upstream_calls.clear()
+    async with client.stream(
+        "POST",
+        f"{LLM}/grok/v1/chat/completions",
+        json={"model": "grok-test", "stream": True, "messages": [{"role": "user", "content": "hi"}]},
+        headers={"Authorization": f"Bearer {setup['key']}"},
+    ) as resp:
+        assert resp.status_code == 200
+        await resp.aread()
+    sent = upstream_calls[-1]
+    assert str(sent.url) == "https://api.x.ai/v1/chat/completions"
+    assert sent.headers["authorization"] == "Bearer xai-real-key-0003"
+    log = (await _logs(setup["id"]))[-1]
+    assert (log.provider, log.model, log.input_tokens, log.output_tokens) == ("grok", "grok-test", 60, 10)
+
+    # Đường dẫn kiểu Anthropic không có ở nhà cung cấp định dạng openai
+    wrong = await client.post(f"{LLM}/grok/v1/messages", json={}, headers={"x-api-key": setup["key"]})
+    assert wrong.status_code == 404
+    assert (await client.post(f"{LLM}/khong-co/v1/chat/completions", json={})).status_code == 404
+
+    listed = {p["code"]: p for p in (await client.get("/llm/providers", headers=admin)).json()}
+    assert listed["anthropic"]["is_builtin"] and listed["grok"]["key_count"] == 1
+    assert (await client.delete("/llm/providers/anthropic", headers=admin)).status_code == 409
+    assert (await client.delete("/llm/providers/grok", headers=admin)).status_code == 409  # còn key + model
+    builtin = {k: listed["anthropic"][k] for k in ("name", "base_url", "extra_headers", "stream_usage", "is_active")}
+    resp = await client.put("/llm/providers/anthropic", json={**builtin, "api_format": "openai"}, headers=admin)
+    assert resp.status_code == 422
+
+    # Tắt nhà cung cấp: gateway trả 404
+    off = {k: grok[k] for k in ("name", "api_format", "base_url", "extra_headers", "stream_usage")}
+    await client.put("/llm/providers/grok", json={**off, "is_active": False}, headers=admin)
+    resp = await client.post(
+        f"{LLM}/grok/v1/chat/completions", json={"model": "grok-test"}, headers={"x-api-key": setup["key"]}
+    )
+    assert resp.status_code == 404

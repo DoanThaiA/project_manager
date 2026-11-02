@@ -6,7 +6,7 @@ import { vi } from "date-fns/locale";
 import { Download, Pencil, Plus, Star, Trash2, Wifi } from "lucide-react";
 import { useState } from "react";
 
-import { RecordBadges, fmtClock, fmtCredit, fmtMinutes, fmtSchedule, fmtTime } from "@/components/attendance";
+import { DayLabel, RecordBadges, fmtClock, fmtCredit, fmtMinutes, fmtSchedule, fmtTime } from "@/components/attendance";
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/form";
@@ -240,11 +240,8 @@ function RecordsTab({
             <tbody>
               {records.data.items.map((r) => (
                 <tr key={r.id}>
-                  <td className="whitespace-nowrap">
-                    <span className="inline-block w-9 text-ink-3 capitalize">
-                      {format(parseISO(r.work_date), "EEE", { locale: vi })}
-                    </span>
-                    {format(parseISO(r.work_date), "dd/MM")}
+                  <td>
+                    <DayLabel date={r.work_date} />
                   </td>
                   <td>
                     <UserChip id={r.user_id} name={r.user?.full_name} />

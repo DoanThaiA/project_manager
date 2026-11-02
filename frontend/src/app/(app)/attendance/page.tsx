@@ -6,7 +6,7 @@ import { vi } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
-import { AttendanceCard, RecordBadges, fmtCredit, fmtMinutes, fmtTime } from "@/components/attendance";
+import { AttendanceCard, DayLabel, RecordBadges, fmtCredit, fmtMinutes, fmtTime } from "@/components/attendance";
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import { Card, PageHeader, Spinner, Stat, Table } from "@/components/ui/misc";
@@ -81,9 +81,8 @@ export default function MyAttendancePage() {
                   const day = parseISO(d.date);
                   return (
                     <tr key={d.date} className={cn(isToday(day) && "bg-brand-soft/40")}>
-                      <td className="whitespace-nowrap">
-                        <span className="inline-block w-9 text-ink-3 capitalize">{format(day, "EEE", { locale: vi })}</span>
-                        {format(day, "dd/MM")}
+                      <td>
+                        <DayLabel date={d.date} />
                       </td>
                       <td className="tabular-nums">{fmtTime(d.record?.check_in_at)}</td>
                       <td className="tabular-nums">{fmtTime(d.record?.check_out_at)}</td>

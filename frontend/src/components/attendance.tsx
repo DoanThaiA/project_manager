@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { format, getISODay, parseISO } from "date-fns";
 import { LogIn, LogOut, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
 
@@ -49,6 +49,17 @@ export function fmtSchedule(days: AttendanceShiftDay[]) {
   return groups
     .map((g) => `${WEEKDAY_LABEL[g.from]}${g.to > g.from ? `–${WEEKDAY_LABEL[g.to]}` : ""} ${g.hours}`)
     .join(" · ");
+}
+
+/** Ô ngày trong bảng công: "T2  02/11" (thứ viết tắt, cột thứ cố định để ngày thẳng hàng). */
+export function DayLabel({ date }: { date: string }) {
+  const day = parseISO(date);
+  return (
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap tabular-nums">
+      <span className="w-6 text-xs font-medium text-ink-3">{WEEKDAY_LABEL[getISODay(day)]}</span>
+      {format(day, "dd/MM")}
+    </span>
+  );
 }
 
 export function RecordBadges({ record }: { record: AttendanceRecord }) {

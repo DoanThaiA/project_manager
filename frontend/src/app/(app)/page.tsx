@@ -6,6 +6,7 @@ import { ArrowRight, Clock, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { AttendanceCard } from "@/components/attendance";
 import { WorkLogModal } from "@/components/project/work-log-form";
 import { MetaBadge } from "@/components/ui/badge";
 import { TextImagesButton, withoutImages } from "@/components/text-images";
@@ -20,7 +21,7 @@ import type { Page, WorkLog } from "@/lib/types";
 import { fmtDate, fmtHours, num } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { me } = useAuth();
+  const { me, can } = useAuth();
   const projects = useProjects();
   const [logOpen, setLogOpen] = useState(false);
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -45,6 +46,8 @@ export default function DashboardPage() {
           </Button>
         }
       />
+
+      {can("attendance.checkin") && <AttendanceCard />}
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Dự án tham gia" value={projects.data?.total ?? "—"} />

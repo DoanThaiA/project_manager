@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     api_tokens,
     attachments,
+    attendance,
     auth,
     crm,
     customers,
@@ -26,6 +27,7 @@ api_router.include_router(notifications.me_router, prefix="/me", tags=["Thông b
 api_router.include_router(api_tokens.router, prefix="/me", tags=["Token truy cập"])
 api_router.include_router(users.router, prefix="/users", tags=["Người dùng"])
 api_router.include_router(roles.router, tags=["Vai trò & chức năng"])
+api_router.include_router(attendance.router, prefix="/attendance", tags=["Chấm công"])
 api_router.include_router(customers.router, prefix="/customers", tags=["Khách hàng"])
 api_router.include_router(projects.router, prefix="/projects", tags=["Dự án"])
 api_router.include_router(sprints.router, prefix="/projects/{project_id}/sprints", tags=["Sprint"])

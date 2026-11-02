@@ -3,7 +3,9 @@
 import {
   Bell,
   Building2,
+  CalendarCheck,
   ClipboardList,
+  Fingerprint,
   FolderKanban,
   History,
   KanbanSquare,
@@ -30,6 +32,7 @@ const MAIN_NAV: NavItem[] = [
   { href: "/", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/projects", label: "Dự án", icon: FolderKanban },
   { href: "/timesheet", label: "Timesheet của tôi", icon: Timer },
+  { href: "/attendance", label: "Chấm công của tôi", icon: CalendarCheck, perm: "attendance.checkin" },
   { href: "/settings/notifications", label: "Thông báo Telegram", icon: Bell },
   { href: "/customers", label: "Khách hàng", icon: Building2, perm: "customer.view" },
 ];
@@ -37,6 +40,7 @@ const MAIN_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin/users", label: "Người dùng", icon: Users, perm: "user.view" },
   { href: "/admin/roles", label: "Vai trò & quyền", icon: ShieldCheck, perm: "role.manage" },
+  { href: "/admin/attendance", label: "Chấm công", icon: Fingerprint, perm: "attendance.view" },
   { href: "/admin/activity", label: "Nhật ký hệ thống", icon: History, perm: "activity_log.view" },
 ];
 

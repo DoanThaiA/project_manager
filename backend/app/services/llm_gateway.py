@@ -44,9 +44,24 @@ class GatewayDisabled(Exception):
 
 
 def _fernet() -> Fernet:
-    if not settings.llm_encryption_key:
+    key = settings.llm_encryption_key.strip()
+    if not key:
         raise GatewayDisabled("Chưa cấu hình LLM_ENCRYPTION_KEY (docs/LLM_GATEWAY.md)")
-    return Fernet(settings.llm_encryption_key.encode())
+    try:
+        return Fernet(key.encode())
+    except ValueError as exc:  # vd dán cả dòng 'LLM_ENCRYPTION_KEY=...' vào giá trị
+        raise GatewayDisabled(
+            "LLM_ENCRYPTION_KEY không hợp lệ: phải là chuỗi 44 ký tự do Fernet.generate_key() sinh ra"
+            " (docs/LLM_GATEWAY.md)"
+        ) from exc
+
+
+def encryption_ready() -> bool:
+    try:
+        _fernet()
+    except GatewayDisabled:
+        return False
+    return True
 
 
 def encrypt_key(raw: str) -> str:

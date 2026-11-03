@@ -125,6 +125,17 @@ async def test_provider_key_is_never_returned(client, setup):
     assert ANTHROPIC_KEY not in stored and gw.decrypt_key(stored) == ANTHROPIC_KEY
 
 
+async def test_invalid_encryption_key_is_clear_error(client, setup, monkeypatch):
+    """Khoá sai định dạng (vd dán cả dòng 'LLM_ENCRYPTION_KEY=...'): báo 503 rõ ràng, không 500."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "llm_encryption_key", "LLM_ENCRYPTION_KEY=" + settings.llm_encryption_key)
+    body = {"provider": "anthropic", "name": "x", "api_key": "sk-ant-test-9999"}
+    resp = await client.post("/llm/provider-keys", json=body, headers=setup["admin"])
+    assert resp.status_code == 503 and "không hợp lệ" in resp.json()["detail"]
+    assert (await client.get("/llm/status", headers=setup["admin"])).json()["enabled"] is False
+
+
 async def test_staff_cannot_manage_gateway(client, login, setup):
     staff = await login("dev.cuong")
     assert (await client.get("/llm/provider-keys", headers=staff)).status_code == 403

@@ -161,7 +161,7 @@ Lỗi của gateway trả theo **định dạng của nhà cung cấp** để SD
 
 | Triệu chứng | Nguyên nhân / cách xử lý |
 |---|---|
-| Trang AI Gateway báo chưa cấu hình `LLM_ENCRYPTION_KEY` | Thiếu biến trong `.env`, hoặc chưa `docker compose up -d` lại |
+| Trang AI Gateway báo chưa cấu hình `LLM_ENCRYPTION_KEY` | Thiếu biến trong `.env`, hoặc chưa `docker compose up -d` lại; hoặc giá trị sai định dạng (chỉ dán phần khoá 44 ký tự, không dán cả `LLM_ENCRYPTION_KEY=`) |
 | Gọi `/llm/...` trả trang HTML của web | Thiếu `location /llm/` trong nginx (request đang đi vào Next.js) |
 | Stream trả về một lần ở cuối thay vì từng chữ | nginx thiếu `proxy_buffering off` |
 | Mọi request 503 "chưa có key … sẵn sàng" | Chưa thêm key, key đang tắt, hoặc mọi key đang tạm nghỉ (xem cột *Lỗi gần nhất*, bấm ⚡ để kiểm tra) |

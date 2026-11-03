@@ -113,7 +113,7 @@ export default function LlmGatewayPage() {
         <Card className="mb-4 flex items-start gap-3 border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
-            Chưa cấu hình <code className="font-mono">LLM_ENCRYPTION_KEY</code> trên server nên chưa lưu được key nhà cung cấp.
+            <code className="font-mono">LLM_ENCRYPTION_KEY</code> trên server chưa đặt hoặc sai định dạng nên chưa lưu được key nhà cung cấp.
             Xem hướng dẫn trong <code className="font-mono">docs/LLM_GATEWAY.md</code>.
           </p>
         </Card>

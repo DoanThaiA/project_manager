@@ -77,9 +77,7 @@ def _key_summary(pk: LlmProviderKey) -> dict:
 
 @router.get("/status", response_model=GatewayStatus)
 async def gateway_status(_: User = Depends(require_permission("llm.view"))):
-    return GatewayStatus(
-        enabled=bool(settings.llm_encryption_key), public_base_url=f"{settings.app_public_url.rstrip('/')}/llm"
-    )
+    return GatewayStatus(enabled=gw.encryption_ready(), public_base_url=f"{settings.app_public_url.rstrip('/')}/llm")
 
 
 # ---------------------------------------------------------------- Nhà cung cấp
@@ -353,13 +351,16 @@ async def _projects(db: AsyncSession, ids: set[int | None]) -> dict[int, Project
     return {p.id: ProjectBrief.model_validate(p) for p in rows}
 
 
-async def _client_key_out(db: AsyncSession, key: LlmClientKey, schema: type[ClientKeyOut] = ClientKeyOut, **extra):
-    projects = await _projects(db, {key.project_id})
-    spent = await spent_this_month(db, key.id)
+async def _client_key_out(
+    db: AsyncSession, client_key: LlmClientKey, schema: type[ClientKeyOut] = ClientKeyOut, **extra
+):
+    """extra: trường thêm của schema, vd key= đầy đủ của ClientKeyCreated (nên tham số không tên 'key')."""
+    projects = await _projects(db, {client_key.project_id})
+    spent = await spent_this_month(db, client_key.id)
     return schema.model_validate(
         {
-            **ClientKeyOut.model_validate(key).model_dump(),
-            "project": projects.get(key.project_id),
+            **ClientKeyOut.model_validate(client_key).model_dump(),
+            "project": projects.get(client_key.project_id),
             "spent_this_month": float(spent),
             **extra,
         }

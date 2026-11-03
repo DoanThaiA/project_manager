@@ -832,7 +832,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Xoá hẳn key đã thu hồi (lịch sử sử dụng giữ lại, hiện là key đã xoá) */
+        delete: operations["delete_client_key_api_v1_llm_client_keys__key_id__delete"];
         options?: never;
         head?: never;
         /** Update Client Key */
@@ -6767,6 +6768,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ClientKeyCreated"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_client_key_api_v1_llm_client_keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

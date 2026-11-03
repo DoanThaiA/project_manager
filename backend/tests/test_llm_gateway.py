@@ -342,3 +342,14 @@ async def test_dynamic_provider_grok(client, login, setup, upstream_calls):
         f"{LLM}/grok/v1/chat/completions", json={"model": "grok-test"}, headers={"x-api-key": setup["key"]}
     )
     assert resp.status_code == 404
+
+
+async def test_delete_client_key_only_after_revoke(client, setup):
+    admin = setup["admin"]
+    created = (await client.post("/llm/client-keys", json={"name": "Tạm"}, headers=admin)).json()
+    assert created["key"].startswith(gw.CLIENT_KEY_PREFIX)
+    assert (await client.delete(f"/llm/client-keys/{created['id']}", headers=admin)).status_code == 409
+    await client.post(f"/llm/client-keys/{created['id']}/revoke", headers=admin)
+    assert (await client.delete(f"/llm/client-keys/{created['id']}", headers=admin)).status_code == 204
+    keys = (await client.get("/llm/client-keys", headers=admin)).json()
+    assert created["id"] not in {k["id"] for k in keys}

@@ -66,7 +66,7 @@ Quyền `llm.manage` (mặc định: admin) để cấu hình; `llm.view` (admin
    danh sách hoặc đang tắt thì gateway từ chối.
 3. **Key dự án** › *Cấp key*: tên, dự án, model được dùng (bỏ trống = tất cả), **hạn mức USD / tháng**, giới hạn
    request / phút, ngày hết hạn. Key đầy đủ **chỉ hiện một lần** kèm đoạn code mẫu — copy gửi cho dự án.
-   Lộ key thì *Thu hồi* (chặn ngay) rồi cấp key mới.
+   Lộ key thì *Thu hồi* (chặn ngay) rồi cấp key mới. Key đã thu hồi có thể *Xoá hẳn* cho gọn danh sách; thống kê chi phí cũ vẫn giữ (hiện là *key đã xoá*).
 4. **Sử dụng & chi phí**: chi phí / token theo key dự án (kèm % hạn mức), theo model, theo ngày; danh sách lỗi.
 
 ## 2a. Thêm nhà cung cấp khác (Grok, DeepSeek, OpenRouter, Ollama…)
@@ -153,7 +153,7 @@ Lỗi của gateway trả theo **định dạng của nhà cung cấp** để SD
 
 - Key nhà cung cấp mã hoá bằng Fernet (AES) với `LLM_ENCRYPTION_KEY`; API không bao giờ trả lại key thật.
 - Key dự án chỉ lưu SHA-256 (như token PAT).
-- Thêm / sửa / xoá key nhà cung cấp, cấp / sửa / thu hồi key dự án đều ghi vào **Nhật ký hệ thống** (không kèm
+- Thêm / sửa / xoá key nhà cung cấp, cấp / sửa / thu hồi / xoá key dự án đều ghi vào **Nhật ký hệ thống** (không kèm
   giá trị key).
 - Gateway không lưu nội dung prompt / câu trả lời.
 

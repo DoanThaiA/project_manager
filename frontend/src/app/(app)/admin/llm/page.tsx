@@ -350,6 +350,14 @@ function ClientKeysTab({ manage, baseUrl }: { manage: boolean; baseUrl?: string 
     },
     onError: toast.error,
   });
+  const remove = useMutation({
+    mutationFn: (id: number) => api.delete(`/llm/client-keys/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["llm"] });
+      toast.success("Đã xoá key");
+    },
+    onError: toast.error,
+  });
 
   return (
     <>
@@ -412,7 +420,19 @@ function ClientKeysTab({ manage, baseUrl }: { manage: boolean; baseUrl?: string 
                 <td className="text-xs whitespace-nowrap text-ink-3">{k.last_used_at ? fmtRelative(k.last_used_at) : "Chưa dùng"}</td>
                 {manage && (
                   <td>
-                    {!k.revoked_at && (
+                    {k.revoked_at ? (
+                      <div className="flex justify-end">
+                        <IconButton
+                          label="Xoá hẳn"
+                          disabled={remove.isPending}
+                          onClick={() =>
+                            confirm(`Xoá hẳn key "${k.name}"? Thống kê chi phí cũ vẫn giữ, hiện là "(key đã xoá)".`) && remove.mutate(k.id)
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </IconButton>
+                      </div>
+                    ) : (
                       <div className="flex justify-end gap-0.5">
                         <IconButton label="Sửa" onClick={() => setEditing(k)}>
                           <Pencil className="size-4" />

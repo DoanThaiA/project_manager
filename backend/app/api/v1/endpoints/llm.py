@@ -475,6 +475,27 @@ async def revoke_client_key(
     return await _client_key_out(db, key)
 
 
+@router.delete(
+    "/client-keys/{key_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Xoá hẳn key đã thu hồi (lịch sử sử dụng giữ lại, hiện là key đã xoá)",
+)
+async def delete_client_key(
+    key_id: int,
+    request: Request,
+    user: User = Depends(require_permission("llm.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    key = await db.get(LlmClientKey, key_id)
+    if key is None:
+        raise not_found("key dự án")
+    if key.revoked_at is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Thu hồi key trước khi xoá")
+    _log(db, request, user, "llm_client_keys", key.id, "delete", {"name": key.name, "project_id": key.project_id})
+    await db.delete(key)  # llm_usage_logs.client_key_id: ON DELETE SET NULL
+    await db.commit()
+
+
 # ---------------------------------------------------------------- Sử dụng
 
 

@@ -70,6 +70,11 @@ export function RecordBadges({ record }: { record: AttendanceRecord }) {
       {record.is_early_leave && <Badge tone="orange">Về sớm {fmtMinutes(record.early_leave_minutes)}</Badge>}
       {record.missing_checkout && <Badge tone="red">Thiếu check-out</Badge>}
       {ok && <Badge tone="green">Đúng giờ</Badge>}
+      {record.source === "admin" && (
+        <span title={record.adjusted_reason ?? undefined}>
+          <Badge tone="gray">Đã chỉnh</Badge>
+        </span>
+      )}
     </span>
   );
 }

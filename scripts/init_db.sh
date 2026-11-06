@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Khởi tạo database project_manager trên PostgreSQL dùng chung (container carbon_analyst_db).
+# Khởi tạo database project_manager trên PostgreSQL dùng chung (container carbon_analyst_db), hoặc PostgreSQL
+# riêng của docker-compose.db.yml (PG_CONTAINER=project_manager_db, PG_SUPERUSER=pm_user).
 #   ./scripts/init_db.sh          # tạo user + database nếu chưa có, chạy migration (Alembic)
 #   ./scripts/init_db.sh --demo   # kèm dữ liệu mẫu (db/seeds/02_demo_data.sql) nếu database còn trống
 # Không bao giờ xoá dữ liệu có sẵn. Schema do Alembic quản lý (backend/migrations), API cũng tự
@@ -31,7 +32,8 @@ SQL
 was_empty="$(psql_pm -Atc "SELECT to_regclass('public.projects') IS NULL")"
 
 echo "→ Chạy migration (alembic upgrade head)"
-docker compose -f "$ROOT/docker-compose.yml" run --rm --build --no-deps api alembic upgrade head
+# Chạy trong $ROOT để docker compose đọc COMPOSE_FILE trong .env (vd thêm docker-compose.db.yml)
+(cd "$ROOT" && docker compose run --rm --build --no-deps api alembic upgrade head)
 
 if [[ "${1:-}" == "--demo" ]]; then
   if [[ "$was_empty" == "t" ]]; then

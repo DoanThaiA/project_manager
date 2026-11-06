@@ -1,0 +1,41 @@
+# PostgreSQL riêng cho Project Manager: VPS không có ai_carbon_analyst (docs/DEPLOY.md mục "Chuyển sang VPS khác").
+# Bật bằng một dòng trong .env (docker compose tự đọc), mọi lệnh docker compose sau đó dùng cả hai file:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.db.yml
+# Mạng shared-db (bên carbon là mạng external) được định nghĩa lại thành mạng riêng do compose tạo, chứa api + db.
+services:
+  db:
+    # <= 17 (postgres 18 đổi thư mục dữ liệu); không thấp hơn phiên bản PostgreSQL của server cũ khi pg_restore
+    image: postgres:${PM_PG_VERSION:-17}
+    container_name: project_manager_db
+    restart: unless-stopped
+    # pm_user là superuser của container riêng này; database project_manager tạo sẵn khi khởi tạo volume
+    environment:
+      POSTGRES_USER: pm_user
+      POSTGRES_PASSWORD: ${PM_DB_PASSWORD:?Thiếu PM_DB_PASSWORD trong .env}
+      POSTGRES_DB: project_manager
+    # current_date (ngày log, quá hạn) theo giờ Việt Nam, như ALTER DATABASE trong scripts/init_db.sh
+    command: ["postgres", "-c", "timezone=Asia/Ho_Chi_Minh"]
+    volumes:
+      - pm_pgdata:/var/lib/postgresql/data
+    networks:
+      - shared-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pm_user -d project_manager"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pm_user:${PM_DB_PASSWORD}@db:5432/project_manager
+    depends_on:
+      db:
+        condition: service_healthy
+
+networks:
+  shared-db:
+    external: false
+    name: project_manager_db
+
+volumes:
+  pm_pgdata:

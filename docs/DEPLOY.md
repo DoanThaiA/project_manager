@@ -273,6 +273,56 @@ docker compose run --rm api alembic upgrade head
 Database tạo trước khi chuyển sang Alembic không cần làm gì thêm: revision `0001` thấy đã có schema thì
 chỉ ghi nhận phiên bản, `0002` dùng `IF NOT EXISTS`.
 
+## Chuyển sang VPS khác (PostgreSQL riêng, không cần carbon)
+
+Ảnh và file đính kèm nằm trên Cloudflare Images / R2 nên chỉ phải chuyển **database** và **`.env`**.
+VPS mới chạy PostgreSQL riêng bằng `docker-compose.db.yml` (container `project_manager_db`, volume `pm_pgdata`).
+Nên dùng VPS từ 2 vCPU / 4 GB RAM (build Next.js tốn RAM).
+
+**Chuẩn bị (hệ thống cũ vẫn chạy):**
+
+1. Hạ TTL bản ghi DNS của domain xuống 300 giây, trước ít nhất 1 ngày.
+2. Xem phiên bản PostgreSQL cũ: `docker exec carbon_analyst_db psql -U postgres -Atc 'show server_version'`.
+   Bản mới không được thấp hơn (mặc định 17; đặt `PM_PG_VERSION` nếu cần, tối đa 17).
+3. VPS mới: cài Docker, nginx, certbot; `git clone <repo> /opt/project_manager`.
+4. **Chép nguyên `.env` từ server cũ** (không sinh lại): `SECRET_KEY` (đổi là mọi người bị đăng xuất, token
+   cũ hết hiệu lực), `LLM_ENCRYPTION_KEY` (đổi là mất key AI Gateway đã lưu), `PM_DB_PASSWORD`. Sửa thêm:
+
+   ```bash
+   COMPOSE_FILE=docker-compose.yml:docker-compose.db.yml
+   PG_CONTAINER=project_manager_db
+   PG_SUPERUSER=pm_user
+   TELEGRAM_BOT_TOKEN=          # tạm để trống: hai server cùng long polling một bot sẽ xung đột
+   ```
+
+   `PM_DB_HOST`, `PM_DB_NETWORK` không còn dùng. `chmod 600 .env`.
+5. Chạy thử với bản sao dữ liệu (lệnh `pg_restore` như bước chuyển thật bên dưới), mở web bằng cách trỏ domain
+   về IP mới trong file hosts của máy mình.
+
+**Chuyển thật (gián đoạn ~10–15 phút):**
+
+```bash
+# Server cũ: dừng ghi rồi dump lần cuối
+cd /opt/project_manager && docker compose stop api web mcp
+docker exec carbon_analyst_db pg_dump -U pm_user -Fc project_manager > /tmp/pm_final.dump
+scp /tmp/pm_final.dump <vps-mới>:/tmp/
+
+# VPS mới
+cd /opt/project_manager
+docker compose up -d db
+docker exec -i project_manager_db pg_restore -U pm_user -d project_manager --clean --if-exists < /tmp/pm_final.dump
+docker compose up -d --build
+curl -s localhost:${PM_API_PORT:-8000}/health
+```
+
+Sau đó: đổi DNS sang IP mới, cấu hình nginx như mục 6 rồi `certbot --nginx -d <domain>`, điền lại
+`TELEGRAM_BOT_TOKEN` và `docker compose up -d api`. Kiểm tra đăng nhập, mở file đính kèm, check-in chấm công,
+`/llm/...`, bot Telegram, connector MCP. Đặt backup như mục 7 với container `project_manager_db`
+(nên chép bản backup ra ngoài VPS). Giữ server cũ ở trạng thái dừng vài ngày rồi mới gỡ.
+
+Lưu ý: không chạy `docker compose down -v` trên VPS mới (xoá volume `pm_pgdata` chứa database). Nếu trước
+nginx có thêm proxy (Cloudflare proxy, load balancer), cập nhật danh sách proxy tin cậy để chấm công nhận đúng IP.
+
 ## Xử lý sự cố
 
 | Triệu chứng | Nguyên nhân / cách xử lý |
